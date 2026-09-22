@@ -51,6 +51,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { LayerControls } from "@/components/views/layer-controls";
 import type { CargoItem, Placement } from "@/types";
 
 const PAD_PX = 58;
@@ -236,8 +237,6 @@ export default function View2D() {
   };
 
   const selectedItemId = selectedIds[0];
-  const selectedHasPlacement =
-    !!selectedItemId && placements.some((p) => p.itemId === selectedItemId);
 
   const doChangeLayer = (direction: -1 | 1) => {
     if (!selectedItemId) return;
@@ -457,40 +456,7 @@ export default function View2D() {
           {/* панель управления видом */}
           <div className="absolute inset-x-2 top-2 z-10 flex items-start justify-between gap-2">
             <div className="glass-strong flex items-center gap-1 rounded-xl p-1">
-              <Select value={String(activeLayer)} onValueChange={(v) => setActiveLayer(Number(v))}>
-                <SelectTrigger className="h-7 w-[124px] rounded-lg px-2 text-[11.5px]" aria-label={t("layer.title")}>
-                  <SquareStack className="size-3.5 text-muted" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="-1">{t("layer.all")}</SelectItem>
-                  {layers.map((l) => (
-                    <SelectItem key={l.index} value={String(l.index)}>
-                      {t("layer.n", { n: l.index + 1 })} · {formatLength(l.z, lengthUnit, locale)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                disabled={!selectedHasPlacement}
-                title={t("layer.up")}
-                aria-label={t("layer.up")}
-                onClick={() => doChangeLayer(1)}
-              >
-                <ChevronUp className="size-4" />
-              </Button>
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                disabled={!selectedHasPlacement}
-                title={t("layer.down")}
-                aria-label={t("layer.down")}
-                onClick={() => doChangeLayer(-1)}
-              >
-                <ChevronDown className="size-4" />
-              </Button>
+              <LayerControls />
             </div>
 
             <div className="glass-strong flex items-center gap-1 rounded-xl p-1">

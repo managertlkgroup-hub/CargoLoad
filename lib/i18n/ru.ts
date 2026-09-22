@@ -132,6 +132,7 @@ export const ru: Record<string, string> = {
   "ctx.showLayer": "Показать слой груза",
   "view.door": "Дверь",
   "view.grid": "Сетка",
+  "view.3d.hint": "Перетаскивайте — вращение · колесо — зум · правая кнопка — панорама",
   "legend.title": "Легенда",
   "legend.more": "ещё {n}",
   "dims.title": "Размеры кузова",

@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   images: { unoptimized: true },
   // React Compiler (Next 16, стабильная опция) — мемоизация без ручных useMemo
   reactCompiler: true,
+  reactStrictMode: false,
 };
 
 export default nextConfig;

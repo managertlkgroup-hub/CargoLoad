@@ -131,6 +131,7 @@ export const en: Record<string, string> = {
   "ctx.showLayer": "Show cargo layer",
   "view.door": "Door",
   "view.grid": "Grid",
+  "view.3d.hint": "Drag — orbit · scroll — zoom · right-drag — pan",
   "legend.title": "Legend",
   "legend.more": "{n} more",
   "dims.title": "Body dimensions",
