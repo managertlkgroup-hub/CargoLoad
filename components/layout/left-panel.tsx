@@ -204,6 +204,7 @@ function CargoRow({
   dimsText: string;
   weightText: string;
 }) {
+  const t = useT();
   return (
     <motion.li
       layout
@@ -237,7 +238,7 @@ function CargoRow({
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label="Изменить"
+          aria-label={t("cargo.edit")}
           onClick={(e) => {
             e.stopPropagation();
             onEdit();
@@ -248,7 +249,7 @@ function CargoRow({
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label="Дублировать"
+          aria-label={t("cargo.duplicate")}
           onClick={(e) => {
             e.stopPropagation();
             onDuplicate();
@@ -259,7 +260,7 @@ function CargoRow({
         <Button
           variant="ghost"
           size="icon-sm"
-          aria-label="Удалить"
+          aria-label={t("cargo.delete")}
           className="hover:text-danger"
           onClick={(e) => {
             e.stopPropagation();

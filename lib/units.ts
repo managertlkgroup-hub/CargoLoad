@@ -16,6 +16,16 @@ export const LENGTH_PRECISION: Record<LengthUnit, number> = { mm: 0, cm: 1, m: 3
 /** Точность отображения веса по единицам. */
 export const WEIGHT_PRECISION: Record<WeightUnit, number> = { kg: 2, t: 4 };
 
+/** Подпись единицы длины («мм»/«см»/«м» — ru, «mm»/«cm»/«m» — en). */
+export function lengthUnitLabel(unit: LengthUnit, locale: Locale): string {
+  return locale === "ru" ? { mm: "мм", cm: "см", m: "м" }[unit] : unit;
+}
+
+/** Подпись единицы веса («кг»/«т» — ru, «kg»/«t» — en). */
+export function weightUnitLabel(unit: WeightUnit, locale: Locale): string {
+  return locale === "ru" ? { kg: "кг", t: "т" }[unit] : unit;
+}
+
 const LENGTH_DIVISOR: Record<LengthUnit, number> = { mm: 1, cm: 10, m: 1000 };
 const WEIGHT_DIVISOR: Record<WeightUnit, number> = { kg: 1, t: 1000 };
 
@@ -57,16 +67,14 @@ export function formatLength(
 ): string {
   const n = formatNumber(lengthToDisplay(mm, unit), LENGTH_PRECISION[unit], locale);
   if (!withUnit) return n;
-  const unitLabel = locale === "ru" ? { mm: "мм", cm: "см", m: "м" }[unit] : unit;
-  return `${n} ${unitLabel}`;
+  return `${n} ${lengthUnitLabel(unit, locale)}`;
 }
 
 /** Отформатированный вес: «1250 кг» / «1.25 т». */
 export function formatWeight(kg: number, unit: WeightUnit, locale: Locale, withUnit = true): string {
   const n = formatNumber(weightToDisplay(kg, unit), WEIGHT_PRECISION[unit], locale);
   if (!withUnit) return n;
-  const unitLabel = locale === "ru" ? { kg: "кг", t: "т" }[unit] : unit;
-  return `${n} ${unitLabel}`;
+  return `${n} ${weightUnitLabel(unit, locale)}`;
 }
 
 /** Объём: м³ с 2 знаками. */

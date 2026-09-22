@@ -1,7 +1,7 @@
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 
-import { importRowSchema, type ImportRow } from "@/lib/validation";
+import { createImportRowSchema, type T, type ImportRow } from "@/lib/validation";
 
 /**
  * Импорт грузов из Excel (.xlsx/.xls) и CSV.
@@ -157,10 +157,11 @@ function finalizeRow(partial: Partial<ImportRow>): ImportRow {
 
 /** Валидация строки; возвращает либо данные, либо сообщение об ошибке. */
 function validateRow(
-  partial: Partial<ImportRow>
+  partial: Partial<ImportRow>,
+  s: T
 ): { ok: true; data: ImportRow } | { ok: false; error: string } {
   const candidate = finalizeRow(partial);
-  const r = importRowSchema.safeParse(candidate);
+  const r = createImportRowSchema(s).safeParse(candidate);
   if (r.success) return { ok: true, data: candidate };
   const messages = new Set(r.error.issues.map((i) => {
     const field = i.path[0];
@@ -182,7 +183,8 @@ const rec = (
 /** Разбор массива записей (объектов) в отчёт. */
 function parseRecords(
   records: unknown[],
-  fieldFromHeader: (h: string) => keyof ImportRow | null
+  fieldFromHeader: (h: string) => keyof ImportRow | null,
+  s: T
 ): ImportParseResult {
   const rows: ImportRow[] = [];
   const errors: ImportErrorRow[] = [];
@@ -208,7 +210,7 @@ function parseRecords(
     total++;
     const partial = mapRow(record, fieldFromHeader);
     const rowNumber = i + 2; // 1 — строка заголовков
-    const result = validateRow(partial);
+    const result = validateRow(partial, s);
     if (result.ok) rows.push(result.data);
     else errors.push({ row: rowNumber, message: result.error });
   }
@@ -222,7 +224,7 @@ function parseRecords(
 }
 
 /** Чтение CSV-текста. */
-function parseCsv(text: string): ImportParseResult {
+function parseCsv(text: string, s: T): ImportParseResult {
   const res = Papa.parse<Record<string, string>>(text.trim(), {
     header: true,
     skipEmptyLines: true,
@@ -237,11 +239,11 @@ function parseCsv(text: string): ImportParseResult {
       error: "csv.parse",
     };
   }
-  return parseRecords(res.data as unknown[], canonicalField);
+  return parseRecords(res.data as unknown[], canonicalField, s);
 }
 
 /** Чтение книги Excel (первый лист). */
-function parseWorkbook(buf: ArrayBuffer): ImportParseResult {
+function parseWorkbook(buf: ArrayBuffer, s: T): ImportParseResult {
   let wb: XLSX.WorkBook;
   try {
     wb = XLSX.read(buf, { type: "array" });
@@ -257,19 +259,19 @@ function parseWorkbook(buf: ArrayBuffer): ImportParseResult {
     defval: "",
     raw: true,
   });
-  return parseRecords(records, canonicalField);
+  return parseRecords(records, canonicalField, s);
 }
 
 /** Главная точка входа: парсинг файла по расширению. */
-export async function parseCargoFile(file: File): Promise<ImportParseResult> {
+export async function parseCargoFile(file: File, s: T): Promise<ImportParseResult> {
   const name = file.name.toLowerCase();
   try {
     if (name.endsWith(".csv") || name.endsWith(".txt")) {
       const text = await file.text();
-      return parseCsv(text);
+      return parseCsv(text, s);
     }
     const buf = await file.arrayBuffer();
-    return parseWorkbook(buf);
+    return parseWorkbook(buf, s);
   } catch {
     return { rows: [], errors: [], total: 0, ok: false, error: "parse.failed" };
   }

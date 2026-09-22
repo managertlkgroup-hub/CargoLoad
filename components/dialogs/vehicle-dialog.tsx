@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { useVehicles } from "@/hooks/use-presets";
 import { useT } from "@/hooks/use-t";
 import { roundTo } from "@/lib/units";
-import { vehicleSchema } from "@/lib/validation";
+import { createVehicleSchema, type T } from "@/lib/validation";
 import { useLayoutStore } from "@/store/use-layout-store";
 import { usePresetsStore } from "@/store/use-presets-store";
 import { useUiStore } from "@/store/use-ui-store";
@@ -137,18 +137,19 @@ function assignPath(
   if (cur[last] == null) cur[last] = node;
 }
 
-const resolver = (async (values: VehicleFormValues) => {
-  const r = vehicleSchema.safeParse(values);
-  // RHF присваивает formState.errors результат resolver безусловно:
-  // без errors: {} он станет undefined и рендер упадёт на errors.<field>.
-  if (r.success) return { errors: {} as FieldErrors<VehicleFormValues>, values };
-  const errors: Record<string, unknown> = {};
-  for (const issue of r.error.issues) {
-    const path = issue.path.filter((p) => typeof p !== "symbol") as (string | number)[];
-    assignPath(errors, path, { type: "validation", message: issue.message });
-  }
-  return { errors: errors as unknown as FieldErrors<VehicleFormValues> };
-}) as unknown as Resolver<VehicleFormValues>;
+const resolverFor = (t: T): Resolver<VehicleFormValues> =>
+  (async (values: VehicleFormValues) => {
+    const r = createVehicleSchema(t).safeParse(values);
+    // RHF присваивает formState.errors результат resolver безусловно:
+    // без errors: {} он станет undefined и рендер упадёт на errors.<field>.
+    if (r.success) return { errors: {} as FieldErrors<VehicleFormValues>, values };
+    const errors: Record<string, unknown> = {};
+    for (const issue of r.error.issues) {
+      const path = issue.path.filter((p) => typeof p !== "symbol") as (string | number)[];
+      assignPath(errors, path, { type: "validation", message: issue.message });
+    }
+    return { errors: errors as unknown as FieldErrors<VehicleFormValues> };
+  }) as unknown as Resolver<VehicleFormValues>;
 
 export function VehicleDialog() {
   const t = useT();
@@ -184,6 +185,8 @@ export function VehicleDialog() {
     return makeDefault(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- сброс формы по ключу открытия
   }, [presetId, vehicles]);
+
+  const resolver = useMemo(() => resolverFor(t), [t]);
 
   const {
     register,

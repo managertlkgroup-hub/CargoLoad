@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { useT } from "@/hooks/use-t";
 import { LIMITS } from "@/lib/constants";
 import { genId } from "@/lib/id";
-import { cargoItemSchema } from "@/lib/validation";
+import { createCargoItemSchema, type T } from "@/lib/validation";
 import { useLayoutStore } from "@/store/use-layout-store";
 import { usePresetsStore } from "@/store/use-presets-store";
 import { useUiStore } from "@/store/use-ui-store";
@@ -105,19 +105,20 @@ function normalize(v: CargoFormValues): CargoFormValues {
   return out;
 }
 
-const resolver = (async (values: CargoFormValues) => {
-  const norm = normalize(values);
-  const r = cargoItemSchema.safeParse(norm);
-  // RHF присваивает formState.errors результат resolver безусловно:
-  // без errors: {} он станет undefined и рендер упадёт на errors.<field>.
-  if (r.success) return { errors: {} as FieldErrors<CargoFormValues>, values: norm };
-  const errors: Record<string, { type: string; message: string }> = {};
-  for (const issue of r.error.issues) {
-    const key = String(issue.path[0] ?? "");
-    if (key && !errors[key]) errors[key] = { type: "validation", message: issue.message };
-  }
-  return { errors: errors as unknown as FieldErrors<CargoFormValues> };
-}) as unknown as Resolver<CargoFormValues>;
+const resolverFor = (t: T): Resolver<CargoFormValues> =>
+  (async (values: CargoFormValues) => {
+    const norm = normalize(values);
+    const r = createCargoItemSchema(t).safeParse(norm);
+    // RHF присваивает formState.errors результат resolver безусловно:
+    // без errors: {} он станет undefined и рендер упадёт на errors.<field>.
+    if (r.success) return { errors: {} as FieldErrors<CargoFormValues>, values: norm };
+    const errors: Record<string, { type: string; message: string }> = {};
+    for (const issue of r.error.issues) {
+      const key = String(issue.path[0] ?? "");
+      if (key && !errors[key]) errors[key] = { type: "validation", message: issue.message };
+    }
+    return { errors: errors as unknown as FieldErrors<CargoFormValues> };
+  }) as unknown as Resolver<CargoFormValues>;
 
 export function CargoDialog() {
   const t = useT();
@@ -164,6 +165,8 @@ export function CargoDialog() {
     }
     return DEFAULTS;
   }, [kind, itemId, presetId, items, customCargo, presets]);
+
+  const resolver = useMemo(() => resolverFor(t), [t]);
 
   const {
     register,

@@ -24,6 +24,8 @@ export interface PdfLayer {
   index: number;
   /** высота слоя, отформатирована (мм) */
   z: string;
+  /** заголовок схемы слоя, локализован */
+  title: string;
   /** размеры поля слоя в мм */
   L: number;
   W: number;
@@ -221,9 +223,7 @@ function SchemesSection({ data }: { data: PdfData }) {
       <Text style={styles.h2}>{data.sections.schemes}</Text>
       {data.layers.map((layer) => (
         <View key={layer.index} style={styles.schemeBox}>
-          <Text style={styles.schemeTitle}>
-            Слой {layer.index + 1} · z = {layer.z}
-          </Text>
+          <Text style={styles.schemeTitle}>{layer.title}</Text>
           <Svg viewBox={`0 0 ${layer.L} ${layer.W}`} style={{ width: "100%", height: 120 }}>
             {layer.boxes.map((b, i) => (
               <Rect

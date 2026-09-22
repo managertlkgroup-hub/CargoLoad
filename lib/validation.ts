@@ -2,138 +2,158 @@ import { z } from "zod";
 
 import { LIMITS, LIMIT_MESSAGES } from "@/lib/constants";
 
-const range = (r: { min: number; max: number }, message: string) =>
-  z
-    .number({ message })
-    .min(r.min, `${message}: минимум ${r.min}`)
-    .max(r.max, `${message}: максимум ${r.max}`);
+/** Переводчик: использовать translate(locale, key, vars). */
+export type T = (key: string, vars?: Record<string, string | number>) => string;
+
+/** Поле с лимитами: сообщение — полностью из i18n (диапазон с единицами). */
+function ranged(s: T, limit: keyof typeof LIMITS, key: string) {
+  const msg = s(`validation.range.${key}`);
+  const { min, max } = LIMITS[limit];
+  return z.number({ message: msg }).min(min, msg).max(max, msg);
+}
 
 /** Груз: все размеры в мм, вес в кг. */
-export const cargoItemSchema = z
-  .object({
-    name: z.string().trim().min(1, "Укажите название").max(120, "Максимум 120 символов"),
-    shape: z.enum(["box", "cylinder", "oversize"]),
-    length: range(LIMITS.cargoLength, LIMIT_MESSAGES.cargoLength),
-    width: range(LIMITS.cargoWidth, LIMIT_MESSAGES.cargoWidth),
-    height: range(LIMITS.cargoHeight, LIMIT_MESSAGES.cargoHeight),
-    diameter: range(LIMITS.diameter, LIMIT_MESSAGES.diameter),
-    weight: range(LIMITS.weight, LIMIT_MESSAGES.weight),
-    quantity: z
-      .number({ message: LIMIT_MESSAGES.quantity })
-      .int("Количество — целое число")
-      .min(LIMITS.quantity.min, `Количество: ${LIMITS.quantity.min}–${LIMITS.quantity.max}`)
-      .max(LIMITS.quantity.max, `Количество: ${LIMITS.quantity.min}–${LIMITS.quantity.max}`),
-    stackable: z.boolean(),
-    maxTopLoad: range(LIMITS.maxTopLoad, LIMIT_MESSAGES.maxTopLoad),
-    group: z.string().trim().min(1, "Укажите группу совместимости").max(40),
-    color: z.string().regex(/^#[0-9a-fA-F]{6}$/, "Цвет в формате #RRGGBB"),
-    cylinderAxis: z.enum(["up", "side"]),
-    stopIndex: z.number().int().min(0).max(99),
-  })
-  .superRefine((v, ctx) => {
-    if (v.shape === "cylinder" && v.diameter < LIMITS.diameter.min) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["diameter"],
-        message: `Диаметр: минимум ${LIMITS.diameter.min} мм`,
-      });
-    }
-    if (v.stackable && v.maxTopLoad <= 0) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["maxTopLoad"],
-        message: "Штабелируемый груз должен выдерживать нагрузку сверху (> 0 кг)",
-      });
-    }
-    if (!v.stackable && v.maxTopLoad > 0) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["stackable"],
-        message: "Нагрузка сверху указана, но груз помечен как нештабелируемый",
-      });
-    }
-  });
+export function createCargoItemSchema(s: T) {
+  return z
+    .object({
+      name: z
+        .string()
+        .trim()
+        .min(1, s("validation.nameRequired"))
+        .max(120, s("validation.nameMax", { n: 120 })),
+      shape: z.enum(["box", "cylinder", "oversize"]),
+      length: ranged(s, "cargoLength", "cargoLength"),
+      width: ranged(s, "cargoWidth", "cargoWidth"),
+      height: ranged(s, "cargoHeight", "cargoHeight"),
+      diameter: ranged(s, "diameter", "diameter"),
+      weight: ranged(s, "weight", "weight"),
+      quantity: z
+        .number({ message: s("validation.quantityInt") })
+        .int(s("validation.quantityInt"))
+        .min(
+          LIMITS.quantity.min,
+          s("validation.quantityRange", { min: LIMITS.quantity.min, max: LIMITS.quantity.max })
+        )
+        .max(
+          LIMITS.quantity.max,
+          s("validation.quantityRange", { min: LIMITS.quantity.min, max: LIMITS.quantity.max })
+        ),
+      stackable: z.boolean(),
+      maxTopLoad: ranged(s, "maxTopLoad", "maxTopLoad"),
+      group: z.string().trim().min(1, s("validation.groupRequired")).max(40),
+      color: z.string().regex(/^#[0-9a-fA-F]{6}$/, s("validation.colorFormat")),
+      cylinderAxis: z.enum(["up", "side"]),
+      stopIndex: z.number().int().min(0).max(99),
+    })
+    .superRefine((v, ctx) => {
+      if (v.shape === "cylinder" && v.diameter < LIMITS.diameter.min) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["diameter"],
+          message: s("validation.cylinderMin", { n: LIMITS.diameter.min }),
+        });
+      }
+      if (v.stackable && v.maxTopLoad <= 0) {
+        ctx.addIssue({ code: "custom", path: ["maxTopLoad"], message: s("validation.stackLoadRequired") });
+      }
+      if (!v.stackable && v.maxTopLoad > 0) {
+        ctx.addIssue({ code: "custom", path: ["stackable"], message: s("validation.stackConflict") });
+      }
+    });
+}
 
-export type CargoItemInput = z.input<typeof cargoItemSchema>;
+export type CargoItemInput = z.input<ReturnType<typeof createCargoItemSchema>>;
 
 /** Автомобиль: размеры в мм, вес в кг. */
-export const axleSchema = z.object({
-  id: z.string().min(1),
-  label: z.string().trim().min(1, "Укажите название оси").max(40),
-  position: z.number().min(-20000, "Позиция: -20000…80000 мм").max(80000),
-  maxLoad: z.number().min(100, "Допуск оси: 100–50000 кг").max(50000),
-  tareShare: z.number().min(0, "Доля снаряжённой массы: 0–1").max(1),
-});
-
-export const vehicleSchema = z
-  .object({
-    name: z.string().trim().min(1, "Укажите название").max(80, "Максимум 80 символов"),
-    nameEn: z.string().trim().max(80).optional().default(""),
-    innerLength: range(LIMITS.vehicleLength, LIMIT_MESSAGES.vehicleLength),
-    innerWidth: range(LIMITS.vehicleWidth, LIMIT_MESSAGES.vehicleWidth),
-    innerHeight: range(LIMITS.vehicleHeight, LIMIT_MESSAGES.vehicleHeight),
-    payload: range(LIMITS.payload, LIMIT_MESSAGES.payload),
-    tare: z.number().min(0, "Снаряжённая масса: 0–100000 кг").max(100000),
-    axleLayout: z.enum(["rigid", "tractor-semi"]),
-    axles: z.array(axleSchema).max(8, "Не более 8 осей"),
-    loadingSides: z
-      .array(z.enum(["rear", "right", "left", "top"]))
-      .min(1, "Выберите хотя бы одну сторону загрузки"),
-    defaultLoadingSide: z.enum(["rear", "right", "left", "top"]),
-    bodyType: z.string().trim().max(60).optional().default(""),
-  })
-  .superRefine((v, ctx) => {
-    if (!v.loadingSides.includes(v.defaultLoadingSide)) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["defaultLoadingSide"],
-        message: "Сторона по умолчанию должна быть среди доступных",
-      });
-    }
-    const sum = v.axles.reduce((s, a) => s + a.tareShare, 0);
-    if (v.axles.length > 0 && Math.abs(sum - 1) > 0.02) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["axles"],
-        message: "Сумма долей снаряжённой массы по осям должна быть равна 1",
-      });
-    }
+export function createAxleSchema(s: T) {
+  return z.object({
+    id: z.string().min(1),
+    label: z.string().trim().min(1, s("validation.axleNameRequired")).max(40),
+    position: z.number().min(-20000, s("validation.axlePosRange")).max(80000),
+    maxLoad: z.number().min(100, s("validation.axleLoadRange")).max(50000),
+    tareShare: z.number().min(0, s("validation.tareShareRange")).max(1),
   });
+}
 
-export type VehicleInput = z.input<typeof vehicleSchema>;
+export function createVehicleSchema(s: T) {
+  return z
+    .object({
+      name: z
+        .string()
+        .trim()
+        .min(1, s("validation.nameRequired"))
+        .max(80, s("validation.nameMax", { n: 80 })),
+      nameEn: z.string().trim().max(80, s("validation.nameMax", { n: 80 })).optional().default(""),
+      innerLength: ranged(s, "vehicleLength", "vehicleLength"),
+      innerWidth: ranged(s, "vehicleWidth", "vehicleWidth"),
+      innerHeight: ranged(s, "vehicleHeight", "vehicleHeight"),
+      payload: ranged(s, "payload", "payload"),
+      tare: z.number().min(0, s("validation.tareRange")).max(100000),
+      axleLayout: z.enum(["rigid", "tractor-semi"]),
+      axles: z.array(createAxleSchema(s)).max(8, s("validation.axlesMax")),
+      loadingSides: z
+        .array(z.enum(["rear", "right", "left", "top"]))
+        .min(1, s("validation.loadingSidesMin")),
+      defaultLoadingSide: z.enum(["rear", "right", "left", "top"]),
+      bodyType: z.string().trim().max(60).optional().default(""),
+    })
+    .superRefine((v, ctx) => {
+      if (!v.loadingSides.includes(v.defaultLoadingSide)) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["defaultLoadingSide"],
+          message: s("validation.defaultSide"),
+        });
+      }
+      const sum = v.axles.reduce((s2, a) => s2 + a.tareShare, 0);
+      if (v.axles.length > 0 && Math.abs(sum - 1) > 0.02) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["axles"],
+          message: s("validation.tareShareSum"),
+        });
+      }
+    });
+}
+
+export type VehicleInput = z.input<ReturnType<typeof createVehicleSchema>>;
 
 /** Зазоры (per-mode). Пустое поле → 0 (обрабатывается в форме). */
 export const gapsSchema = z.object({
-  wall: range(LIMITS.gaps, LIMIT_MESSAGES.gaps),
-  rowWidth: range(LIMITS.gaps, LIMIT_MESSAGES.gaps),
-  rowLength: range(LIMITS.gaps, LIMIT_MESSAGES.gaps),
+  wall: z.number({ message: LIMIT_MESSAGES.gaps }).min(LIMITS.gaps.min).max(LIMITS.gaps.max),
+  rowWidth: z.number({ message: LIMIT_MESSAGES.gaps }).min(LIMITS.gaps.min).max(LIMITS.gaps.max),
+  rowLength: z.number({ message: LIMIT_MESSAGES.gaps }).min(LIMITS.gaps.min).max(LIMITS.gaps.max),
 });
 
 export type GapsInput = z.input<typeof gapsSchema>;
 
 /** Название сессии. */
-export const sessionNameSchema = z
-  .string()
-  .trim()
-  .min(1, "Укажите название сессии")
-  .max(60, "Максимум 60 символов");
+export function createSessionNameSchema(s: T) {
+  return z
+    .string()
+    .trim()
+    .min(1, s("validation.sessionName"))
+    .max(60, s("validation.sessionNameMax"));
+}
 
 /** Строка импорта Excel/CSV. */
-export const importRowSchema = z.object({
-  name: z.string().trim().min(1, "нет названия"),
-  shape: z.enum(["box", "cylinder", "oversize"]),
-  length: range(LIMITS.cargoLength, LIMIT_MESSAGES.cargoLength),
-  width: range(LIMITS.cargoWidth, LIMIT_MESSAGES.cargoWidth),
-  height: range(LIMITS.cargoHeight, LIMIT_MESSAGES.cargoHeight),
-  diameter: range(LIMITS.diameter, LIMIT_MESSAGES.diameter),
-  weight: range(LIMITS.weight, LIMIT_MESSAGES.weight),
-  quantity: z.number().int().min(1).max(10000),
-  stackable: z.boolean(),
-  group: z.string().min(1),
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
-});
+export function createImportRowSchema(s: T) {
+  return z.object({
+    name: z.string().trim().min(1, s("validation.importName")),
+    shape: z.enum(["box", "cylinder", "oversize"]),
+    length: ranged(s, "cargoLength", "cargoLength"),
+    width: ranged(s, "cargoWidth", "cargoWidth"),
+    height: ranged(s, "cargoHeight", "cargoHeight"),
+    diameter: ranged(s, "diameter", "diameter"),
+    weight: ranged(s, "weight", "weight"),
+    quantity: z.number().int().min(1).max(10000),
+    stackable: z.boolean(),
+    group: z.string().min(1),
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+  });
+}
 
-export type ImportRow = z.input<typeof importRowSchema>;
+export type ImportRow = z.input<ReturnType<typeof createImportRowSchema>>;
 
 /**
  * Валидация с откатом: применяет схему, возвращает либо данные,
@@ -146,5 +166,5 @@ export function validateOrError<T extends z.ZodType>(
   const result = schema.safeParse(data);
   if (result.success) return { ok: true, data: result.data };
   const first = result.error.issues[0];
-  return { ok: false, error: first?.message ?? "Некорректные данные" };
+  return { ok: false, error: first?.message ?? "" };
 }

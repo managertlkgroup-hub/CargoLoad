@@ -15,7 +15,13 @@ import { AnimatedNumber } from "@/components/panels/animated-number";
 import { useUiStore } from "@/store/use-ui-store";
 import { useT } from "@/hooks/use-t";
 import { cn } from "@/lib/utils";
-import { formatNumber, formatVolume, formatWeight } from "@/lib/units";
+import {
+  formatLength,
+  formatNumber,
+  formatVolume,
+  formatWeight,
+  weightUnitLabel,
+} from "@/lib/units";
 import { Badge } from "@/components/ui/badge";
 import type { LoadMetrics } from "@/types";
 
@@ -34,9 +40,10 @@ const COG_LEVEL_VARIANT: Record<LoadMetrics["cog"]["level"], "success" | "warnin
 export function MetricsPanel({ metrics }: { metrics: LoadMetrics }) {
   const t = useT();
   const locale = useUiStore((s) => s.locale);
+  const lengthUnit = useUiStore((s) => s.lengthUnit);
   const weightUnit = useUiStore((s) => s.weightUnit);
 
-  const mmFmt = (v: number) => `${formatNumber(v, 1, locale)} мм`;
+  const lenFmt = (v: number) => formatLength(v, lengthUnit, locale);
   const pctFmt = (v: number) => `${formatNumber(v, 1, locale)} %`;
 
   const bboxNo = metrics.bboxNoGaps;
@@ -110,8 +117,8 @@ export function MetricsPanel({ metrics }: { metrics: LoadMetrics }) {
           {t("metric.bbox")}
         </div>
         <div className="space-y-1">
-          <BBoxRow label={t("metric.bboxNoGaps")} b={bboxNo} fmt={mmFmt} />
-          <BBoxRow label={t("metric.bboxWithGaps")} b={bboxWith} fmt={mmFmt} />
+          <BBoxRow label={t("metric.bboxNoGaps")} b={bboxNo} fmt={lenFmt} />
+          <BBoxRow label={t("metric.bboxWithGaps")} b={bboxWith} fmt={lenFmt} />
         </div>
       </Card>
 
@@ -210,7 +217,8 @@ export function MetricsPanel({ metrics }: { metrics: LoadMetrics }) {
                     />
                   </div>
                   <span className="tnum shrink-0 text-[10.5px] text-muted">
-                    {formatNumber(a.loadKg, 0, locale)} / {formatNumber(a.maxLoadKg, 0, locale)} кг
+                    {formatWeight(a.loadKg, weightUnit, locale, false)} /{" "}
+                    {formatWeight(a.maxLoadKg, weightUnit, locale, false)} {weightUnitLabel(weightUnit, locale)}
                   </span>
                 </div>
               </div>

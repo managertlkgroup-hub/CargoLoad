@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { useT } from "@/hooks/use-t";
-import { sessionNameSchema, validateOrError } from "@/lib/validation";
+import { createSessionNameSchema, validateOrError } from "@/lib/validation";
 import { cn } from "@/lib/utils";
 import { useSessionsStore } from "@/store/use-sessions-store";
 import { useUiStore } from "@/store/use-ui-store";
@@ -57,7 +57,7 @@ export function SessionsDialog() {
   );
 
   const onSave = () => {
-    const r = validateOrError(sessionNameSchema, name);
+    const r = validateOrError(createSessionNameSchema(t), name);
     if (!r.ok) {
       toast.error(r.error);
       return;

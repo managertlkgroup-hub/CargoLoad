@@ -79,7 +79,7 @@ export function ImportDialog() {
     setBusy(true);
     setFileName(file.name);
     try {
-      const res = await parseCargoFile(file);
+      const res = await parseCargoFile(file, t);
       setResult(res);
     } finally {
       setBusy(false);

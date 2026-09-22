@@ -235,7 +235,9 @@ function FitRow({
           <span className="text-muted">{t("fit.layers", { n: f.layers })}</span>
         </span>
         <span>
-          <span className="text-muted">Д×Ш×В </span>
+          <span className="text-muted">
+            {t("dims.l")}×{t("dims.w")}×{t("dims.h")}{" "}
+          </span>
           {formatLength(v.innerLength, lengthUnit, locale)} ×{" "}
           {formatLength(v.innerWidth, lengthUnit, locale)} ×{" "}
           {formatLength(v.innerHeight, lengthUnit, locale)}

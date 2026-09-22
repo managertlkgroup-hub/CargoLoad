@@ -10,10 +10,10 @@ import { LIMITS } from "@/lib/constants";
 import { useLayoutStore } from "@/store/use-layout-store";
 import type { Gaps, PackMode } from "@/types";
 
-const MODE_OPTIONS: Array<{ value: PackMode; label: string }> = [
-  { value: "along", label: "Вдоль" },
-  { value: "cross", label: "Поперёк" },
-  { value: "mixed", label: "Смешанный" },
+const MODE_VALUES: Array<{ value: PackMode; key: string }> = [
+  { value: "along", key: "mode.along" },
+  { value: "cross", key: "mode.cross" },
+  { value: "mixed", key: "mode.mixed" },
 ];
 
 /** Ручной ввод с валидацией: пустое → 0, вне диапазона → откат + тост. */
@@ -114,7 +114,7 @@ export function GapsPanel() {
         <Segmented
           id="gaps-mode"
           value={editMode}
-          options={MODE_OPTIONS}
+          options={MODE_VALUES.map((o) => ({ value: o.value, label: t(o.key) }))}
           onChange={(v) => setEditMode(v)}
           className="w-full"
           ariaLabel={t("gaps.mode")}

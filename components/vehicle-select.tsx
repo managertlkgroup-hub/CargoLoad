@@ -6,7 +6,7 @@ import { useT } from "@/hooks/use-t";
 import { useVehicle } from "@/hooks/use-vehicle";
 import { useVehicles } from "@/hooks/use-presets";
 import { cn } from "@/lib/utils";
-import { formatLength, formatNumber, formatWeight } from "@/lib/units";
+import { formatLength, formatWeight, lengthUnitLabel } from "@/lib/units";
 import { useLayoutStore } from "@/store/use-layout-store";
 import { useUiStore } from "@/store/use-ui-store";
 import {
@@ -74,15 +74,15 @@ export function VehicleSelect() {
               </div>
               <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11.5px] text-fg-2">
                 <span className="tnum">
-                  <span className="text-muted">Д </span>
+                  <span className="text-muted">{t("dims.l")} </span>
                   {formatLength(v.innerLength, lengthUnit, locale)}
                 </span>
                 <span className="tnum">
-                  <span className="text-muted">Ш </span>
+                  <span className="text-muted">{t("dims.w")} </span>
                   {formatLength(v.innerWidth, lengthUnit, locale)}
                 </span>
                 <span className="tnum">
-                  <span className="text-muted">В </span>
+                  <span className="text-muted">{t("dims.h")} </span>
                   {formatLength(v.innerHeight, lengthUnit, locale)}
                 </span>
                 <span className="tnum">
@@ -91,9 +91,11 @@ export function VehicleSelect() {
                 </span>
               </div>
               <div className="mt-1.5 text-[10.5px] text-muted">
-                {t("vehicle.dims")}: {formatNumber(v.innerLength / 1000, 2, locale)}×
-                {formatNumber(v.innerWidth / 1000, 2, locale)}×
-                {formatNumber(v.innerHeight / 1000, 2, locale)} м
+                {t("vehicle.dims")}:{" "}
+                {formatLength(v.innerLength, lengthUnit, locale, false)}×
+                {formatLength(v.innerWidth, lengthUnit, locale, false)}×
+                {formatLength(v.innerHeight, lengthUnit, locale, false)}{" "}
+                {lengthUnitLabel(lengthUnit, locale)}
               </div>
             </button>
           );

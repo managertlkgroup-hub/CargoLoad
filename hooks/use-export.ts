@@ -70,7 +70,8 @@ function baseName(m: ExportModel): string {
 /* ----------------------------- PDF текст ----------------------------- */
 
 function buildPdfData(m: ExportModel): PdfData {
-  const s = (k: string) => translate(m.locale, k);
+  const s = (k: string, vars?: Record<string, string | number>) =>
+    translate(m.locale, k, vars);
   const n = (v: number, d = 1) => formatNumber(v, d, m.locale);
   const len = (v: number) => formatLength(v, m.lengthUnit, m.locale);
   const kg = (v: number) => formatWeight(v, m.weightUnit, m.locale);
@@ -187,7 +188,15 @@ function buildPdfData(m: ExportModel): PdfData {
         color,
         name: colorName.get(color) ?? color,
       }));
-      return { index: layer.index, z: len(layer.z), L: v.innerLength, W: v.innerWidth, boxes, legend };
+      return {
+        index: layer.index,
+        z: len(layer.z),
+        title: s("export.layer", { n: layer.index + 1, z: len(layer.z) }),
+        L: v.innerLength,
+        W: v.innerWidth,
+        boxes,
+        legend,
+      };
     });
 
   return {
@@ -229,7 +238,8 @@ function buildPdfData(m: ExportModel): PdfData {
 /* ----------------------------- XLSX текст ----------------------------- */
 
 function buildXlsxTexts(m: ExportModel): XlsxTexts {
-  const s = (k: string) => translate(m.locale, k);
+  const s = (k: string, vars?: Record<string, string | number>) =>
+    translate(m.locale, k, vars);
   return {
     sheets: {
       params: s("export.section.params"),

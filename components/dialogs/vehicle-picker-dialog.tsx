@@ -86,15 +86,15 @@ export function VehiclePickerDialog() {
 
                   <div className="tnum mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11.5px] text-fg-2">
                     <span>
-                      <span className="text-muted">Д </span>
+                      <span className="text-muted">{t("dims.l")} </span>
                       {formatLength(v.innerLength, lengthUnit, locale)}
                     </span>
                     <span>
-                      <span className="text-muted">Ш </span>
+                      <span className="text-muted">{t("dims.w")} </span>
                       {formatLength(v.innerWidth, lengthUnit, locale)}
                     </span>
                     <span>
-                      <span className="text-muted">В </span>
+                      <span className="text-muted">{t("dims.h")} </span>
                       {formatLength(v.innerHeight, lengthUnit, locale)}
                     </span>
                     <span>
