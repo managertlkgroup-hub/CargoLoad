@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, LayoutGrid, Pencil, Truck } from "lucide-react";
+import { Check, ChevronDown, LayoutGrid, Pencil, ScanSearch, Truck } from "lucide-react";
 
 import { useT } from "@/hooks/use-t";
 import { useVehicle } from "@/hooks/use-vehicle";
@@ -99,6 +99,10 @@ export function VehicleSelect() {
           );
         })}
         <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => openDialog({ kind: "vehicleFit" })}>
+          <ScanSearch className="size-4 text-accent" />
+          {t("vehicle.pickFit")}
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => openDialog({ kind: "vehiclePicker" })}>
           <LayoutGrid className="size-4 text-accent" />
           {t("vehicle.catalog")}

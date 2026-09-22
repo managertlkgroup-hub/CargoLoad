@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Boxes, Copy, Layers, Pencil, Plus, SlidersHorizontal, Trash2, X } from "lucide-react";
+import { Boxes, Copy, Layers, Pencil, Plus, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { useCargoPresets } from "@/hooks/use-presets";
@@ -60,6 +60,15 @@ export function LeftPanel({ onClose }: { onClose?: () => void }) {
           </span>
         </div>
         <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={t("import.title")}
+            title={t("import.title")}
+            onClick={() => openDialog({ kind: "import" })}
+          >
+            <Upload className="size-4" />
+          </Button>
           <Button
             variant="ghost"
             size="icon-sm"

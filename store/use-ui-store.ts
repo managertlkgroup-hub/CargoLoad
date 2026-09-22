@@ -11,7 +11,9 @@ export type DialogState =
   | { kind: "vehiclePreset"; presetId?: string }
   | { kind: "presets"; tab?: "cargo" | "vehicle" }
   | { kind: "sessions" }
-  | { kind: "vehiclePicker" };
+  | { kind: "vehiclePicker" }
+  | { kind: "vehicleFit" }
+  | { kind: "import" };
 
 interface UiState {
   locale: Locale;
