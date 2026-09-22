@@ -25,6 +25,9 @@ function captureLayout(): SessionData {
     placements: s.placements,
     stops: s.stops,
     loadingSide: s.loadingSide,
+    stacking: s.stacking,
+    lifo: s.lifo,
+    maxLayers: s.maxLayers,
   };
 }
 
@@ -65,6 +68,6 @@ export const useSessionsStore = create<SessionsState>()(
 
       removeSession: (id) => set((s) => ({ sessions: s.sessions.filter((x) => x.id !== id) })),
     }),
-    { name: "cargoplanner.sessions", version: 1 }
+    { name: "cargoplanner.sessions", version: 1, skipHydration: true }
   )
 );

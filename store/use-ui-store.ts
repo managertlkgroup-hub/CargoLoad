@@ -61,7 +61,7 @@ export const useUiStore = create<UiState>()(
       setLeftPanel: (leftPanelOpen) => set({ leftPanelOpen }),
       setRightPanel: (rightPanelOpen) => set({ rightPanelOpen }),
     }),
-    { name: "cargoplanner.ui", version: 1 }
+    { name: "cargoplanner.ui", version: 1, skipHydration: true }
   )
 );
 

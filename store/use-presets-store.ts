@@ -105,6 +105,6 @@ export const usePresetsStore = create<PresetsState>()(
           return { vehicleOverrides: next };
         }),
     }),
-    { name: "cargoplanner.presets", version: 1 }
+    { name: "cargoplanner.presets", version: 1, skipHydration: true }
   )
 );

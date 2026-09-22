@@ -17,6 +17,9 @@ export interface SessionData {
   placements: Placement[];
   stops: LoadStop[];
   loadingSide: LoadingSide;
+  stacking?: boolean;
+  lifo?: boolean;
+  maxLayers?: number;
 }
 
 export interface SavedSession {

@@ -55,6 +55,12 @@ interface LayoutState {
   selectedIds: string[];
   packStatus: PackStatus;
   lastPackMs: number;
+  /** учитывать ли штабелирование при расчёте */
+  stacking: boolean;
+  /** LIFO-порядок для мульти-стопа */
+  lifo: boolean;
+  /** ограничение слоёв (0 = без ограничения) */
+  maxLayers: number;
   /** метрики последнего расчёта (заполняет lib/packing/metrics) */
   metrics: LoadMetrics | null;
 
@@ -73,6 +79,9 @@ interface LayoutState {
   setLoadingSide: (side: LoadingSide) => void;
   setMode: (mode: PackMode) => void;
   setGaps: (mode: PackMode, gaps: Gaps) => void;
+  setStacking: (v: boolean) => void;
+  setLifo: (v: boolean) => void;
+  setMaxLayers: (v: number) => void;
 
   // — раскладка —
   setPackResult: (result: PackResult, ms?: number) => void;
@@ -155,6 +164,9 @@ export const useLayoutStore = create<LayoutState>()(
       selectedIds: [],
       packStatus: "idle",
       lastPackMs: 0,
+      stacking: true,
+      lifo: true,
+      maxLayers: 0,
       metrics: null,
       past: [],
       future: [],
@@ -228,6 +240,21 @@ export const useLayoutStore = create<LayoutState>()(
       setGaps: (mode, gaps) => {
         get().pushHistory();
         set((s) => ({ gaps: { ...s.gaps, [mode]: gaps } }));
+      },
+
+      setStacking: (stacking) => {
+        get().pushHistory();
+        set({ stacking });
+      },
+
+      setLifo: (lifo) => {
+        get().pushHistory();
+        set({ lifo });
+      },
+
+      setMaxLayers: (maxLayers) => {
+        get().pushHistory();
+        set({ maxLayers: Math.max(0, Math.round(maxLayers)) });
       },
 
       setPackResult: (result, ms) => {
@@ -456,6 +483,9 @@ export const useLayoutStore = create<LayoutState>()(
           placements: data.placements,
           stops: data.stops,
           loadingSide: data.loadingSide ?? "rear",
+          stacking: data.stacking ?? true,
+          lifo: data.lifo ?? true,
+          maxLayers: data.maxLayers ?? 0,
           selectedIds: [],
           layers: [],
           unplaced: [],
@@ -467,6 +497,7 @@ export const useLayoutStore = create<LayoutState>()(
     {
       name: "cargoplanner.layout",
       version: 1,
+      skipHydration: true,
       partialize: (s) => ({
         items: s.items,
         vehicleId: s.vehicleId,
@@ -477,6 +508,9 @@ export const useLayoutStore = create<LayoutState>()(
         unplaced: s.unplaced,
         layers: s.layers,
         stops: s.stops,
+        stacking: s.stacking,
+        lifo: s.lifo,
+        maxLayers: s.maxLayers,
       }),
     }
   )

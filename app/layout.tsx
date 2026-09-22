@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { AppToaster } from "@/components/app-toaster";
 import { ThemeProvider } from "@/components/theme-provider";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 // Inter self-hosted из public/fonts — @font-face c unicode-range см. в globals.css
 
@@ -22,10 +23,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ru" suppressHydrationWarning>
       <body className="font-sans antialiased">
         <ThemeProvider>
-          <div className="aurora" aria-hidden />
-          <div className="grain" aria-hidden />
-          {children}
-          <AppToaster />
+          <TooltipProvider delayDuration={300}>
+            <div className="aurora" aria-hidden />
+            <div className="grain" aria-hidden />
+            {children}
+            <AppToaster />
+          </TooltipProvider>
         </ThemeProvider>
       </body>
     </html>
