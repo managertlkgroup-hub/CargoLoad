@@ -1,4 +1,5 @@
 import type { CylinderAxis } from "@/types/cargo";
+import type { LoadingSide } from "@/types/vehicle";
 
 /** Режим раскладки: вдоль (все по X), поперёк (90°), смешанный (оптимально). */
 export type PackMode = "along" | "cross" | "mixed";
@@ -75,4 +76,6 @@ export interface PackRequest {
   maxLayers: number;
   /** LIFO-приоритет: последняя точка выгрузки — ближе всего к двери */
   lifo: boolean;
+  /** сторона загрузки — влияет на якорь и порядок заполнения */
+  loadingSide: LoadingSide;
 }
