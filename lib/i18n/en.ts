@@ -243,6 +243,34 @@ export const en: Record<string, string> = {
   "snap.on": "On",
   "snap.off": "Off",
 
+  "export.pdf": "Export PDF",
+  "export.png": "PNG snapshot",
+  "export.excel": "Export Excel",
+  "export.section.params": "Layout parameters",
+  "export.section.metrics": "Metrics",
+  "export.section.goods": "Cargo",
+  "export.section.schemes": "Layer schemes",
+  "export.section.instructions": "Loading instructions",
+  "export.generated": "Generated",
+  "export.sheet.layout": "Layout",
+  "export.x": "X",
+  "export.y": "Y",
+  "export.z": "Z",
+  "export.yaw": "Yaw",
+  "export.size": "Size",
+  "export.axis": "Orientation",
+  "export.instructions.p1":
+    "Place cargo layer by layer, bottom to top: the first bottom layer, then the ones above. Keep the gaps between rows and from the walls.",
+  "export.instructions.p2":
+    "Heavy cargo goes to the bottom, closer to the front wall. Do not place cargo on non-stackable items.",
+  "export.instructions.p3":
+    "Secure the cargo with straps. With multiple drop-off stops, unload in reverse loading order (LIFO).",
+
+  "common.yes": "Yes",
+  "common.no": "No",
+  "toast.exportReady": "File downloaded",
+  "toast.exportFail": "Could not create the file",
+
   "layer.title": "Layer",
   "layer.n": "Layer {n}",
   "layer.all": "All layers",

@@ -9,6 +9,7 @@ import * as THREE from "three";
 
 import { useT } from "@/hooks/use-t";
 import { useVehicle } from "@/hooks/use-vehicle";
+import { registerCapture } from "@/lib/export/capture";
 import { dimsFor } from "@/lib/geometry";
 import { useLayoutStore } from "@/store/use-layout-store";
 import { useUiStore } from "@/store/use-ui-store";
@@ -339,6 +340,23 @@ function CameraRig({ L, W, H }: { L: number; W: number; H: number }) {
 
 /* ----------------------------- сцена ----------------------------- */
 
+/** Регистрирует canvas в реестре PNG-экспорта (preserveDrawingBuffer даёт
+ *  возможность читать пиксели из 3D-вида в момент экспорта). */
+function CaptureGL() {
+  const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
+  const camera = useThree((s) => s.camera);
+
+  useEffect(() => {
+    return registerCapture({
+      canvas: gl.domElement,
+      render: () => gl.render(scene, camera),
+    });
+  }, [gl, scene, camera]);
+
+  return null;
+}
+
 export default function View3D() {
   const t = useT();
   const { theme } = useTheme();
@@ -391,7 +409,7 @@ export default function View3D() {
     <div className="absolute inset-0">
       <Canvas
         dpr={[1, 2]}
-        gl={{ antialias: true, alpha: true }}
+        gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true }}
         camera={{ fov: 38, near: 0.05, far: 2000, position: [l * 1.2, H * S + l * 0.6, w * 1.4] }}
         onPointerMissed={() => clearSelection()}
       >
@@ -434,6 +452,7 @@ export default function View3D() {
           />
         ))}
 
+        <CaptureGL />
         <CameraRig L={L} W={W} H={H} />
         <OrbitControls
           makeDefault

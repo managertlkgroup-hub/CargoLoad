@@ -244,6 +244,34 @@ export const ru: Record<string, string> = {
   "snap.on": "Вкл",
   "snap.off": "Выкл",
 
+  "export.pdf": "Экспорт PDF",
+  "export.png": "Снимок PNG",
+  "export.excel": "Экспорт Excel",
+  "export.section.params": "Параметры раскладки",
+  "export.section.metrics": "Метрики",
+  "export.section.goods": "Грузы",
+  "export.section.schemes": "Схемы по слоям",
+  "export.section.instructions": "Инструкция грузчикам",
+  "export.generated": "Сформировано",
+  "export.sheet.layout": "Раскладка",
+  "export.x": "X",
+  "export.y": "Y",
+  "export.z": "Z",
+  "export.yaw": "Поворот",
+  "export.size": "Размер",
+  "export.axis": "Ориентация",
+  "export.instructions.p1":
+    "Грузы ставятся по слоям снизу вверх: сначала нижний, затем верхние. Соблюдайте зазоры между рядами и от стен кузова.",
+  "export.instructions.p2":
+    "Тяжёлые грузы — вниз и ближе к передней стенке. Не кладите грузы на нештабелируемые.",
+  "export.instructions.p3":
+    "Закрепите груз ремнями. При нескольких точках выгрузки выгружайте в порядке, обратном загрузке (LIFO).",
+
+  "common.yes": "Да",
+  "common.no": "Нет",
+  "toast.exportReady": "Файл скачан",
+  "toast.exportFail": "Не удалось создать файл",
+
   "layer.title": "Слой",
   "layer.n": "Слой {n}",
   "layer.all": "Все слои",

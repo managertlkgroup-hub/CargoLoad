@@ -2,9 +2,13 @@
 
 import {
   AlignEndHorizontal,
+  Camera,
   Columns3,
+  FileSpreadsheet,
+  FileText,
   LayoutGrid,
   Library,
+  Loader2,
   PanelLeft,
   PanelRight,
   Redo2,
@@ -14,6 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { useExport } from "@/hooks/use-export";
 import { useT } from "@/hooks/use-t";
 import { LoadingSideSelect } from "@/components/loading-side-select";
 import { Logo } from "@/components/logo";
@@ -55,6 +60,8 @@ export function TopBar() {
   const setLeft = useUiStore((s) => s.setLeftPanel);
   const setRight = useUiStore((s) => s.setRightPanel);
   const openDialog = useUiStore((s) => s.openDialog);
+
+  const { busy, exporting, canExport, exportPdf, exportPng, exportExcel } = useExport();
 
   return (
     <header className="glass sticky top-0 z-40 m-3 mb-0 rounded-2xl px-3 py-2.5">
@@ -139,6 +146,65 @@ export function TopBar() {
               { value: "3d", label: t("view.3d") },
             ]}
           />
+
+          <span className="mx-0.5 h-6 w-px bg-border" />
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                disabled={!canExport || exporting}
+                aria-label={t("export.pdf")}
+                onClick={exportPdf}
+              >
+                {busy === "pdf" ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <FileText className="size-4" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t("export.pdf")}</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                disabled={!canExport || exporting}
+                aria-label={t("export.png")}
+                onClick={exportPng}
+              >
+                {busy === "png" ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Camera className="size-4" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t("export.png")}</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                disabled={!canExport || exporting}
+                aria-label={t("export.excel")}
+                onClick={exportExcel}
+              >
+                {busy === "excel" ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <FileSpreadsheet className="size-4" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t("export.excel")}</TooltipContent>
+          </Tooltip>
 
           <Tooltip>
             <TooltipTrigger asChild>
