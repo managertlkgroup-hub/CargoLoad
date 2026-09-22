@@ -233,4 +233,89 @@ describe("packing core", () => {
     expect(r.placements.length).toBeGreaterThanOrEqual(90);
     expect(ms).toBeLessThan(1000);
   });
+
+  it("keep: ручная позиция сохраняется, новый груз укладывается вокруг", () => {
+    const a = makeItem({ id: "a", quantity: 1 });
+    const b = makeItem({ id: "b", quantity: 1, length: 900, width: 700, height: 700 });
+    ITEMS = [a, b];
+    const manual: Placement = {
+      id: "a:0",
+      itemId: "a",
+      unitIndex: 0,
+      x: 5000,
+      y: 800,
+      z: 0,
+      yaw: 90,
+      axis: "up",
+      stopIndex: 0,
+    };
+    const r = packLayout(req({ items: ITEMS, keep: [manual] }));
+    const kept = r.placements.find((p) => p.itemId === "a")!;
+    expect(kept).toBeDefined();
+    expect(kept.x).toBe(5000);
+    expect(kept.y).toBe(800);
+    expect(kept.yaw).toBe(90);
+    expect(r.placements.some((p) => p.itemId === "b")).toBe(true);
+    expect(r.unplaced).toHaveLength(0);
+    checkInvariants(r, kamaz, NO_GAP);
+  });
+
+  it("keep: невалидная позиция (за габаритами) отбрасывается и переупаковывается", () => {
+    const a = makeItem({ id: "a", quantity: 1 });
+    ITEMS = [a];
+    const bad: Placement = {
+      id: "a:0",
+      itemId: "a",
+      unitIndex: 0,
+      x: 99000,
+      y: 0,
+      z: 0,
+      yaw: 0,
+      axis: "up",
+      stopIndex: 0,
+    };
+    const r = packLayout(req({ items: ITEMS, keep: [bad] }));
+    expect(r.placements).toHaveLength(1);
+    const p = r.placements[0];
+    expect(p.x + dimsFor(a, p.yaw, p.axis).dx).toBeLessThanOrEqual(
+      kamaz.innerLength + 0.5
+    );
+    expect(r.unplaced).toHaveLength(0);
+  });
+
+  it("keep: лишняя keep-единица (кол-во уменьшилось) не считается размещённой", () => {
+    const a = makeItem({ id: "a", quantity: 2 });
+    ITEMS = [a];
+    const keeps: Placement[] = [
+      { id: "a:0", itemId: "a", unitIndex: 0, x: 100, y: 100, z: 0, yaw: 0, axis: "up", stopIndex: 0 },
+      { id: "a:3", itemId: "a", unitIndex: 3, x: 900, y: 100, z: 0, yaw: 0, axis: "up", stopIndex: 0 },
+    ];
+    const r = packLayout(req({ items: ITEMS, keep: keeps }));
+    const ids = r.placements.map((p) => p.id).sort();
+    expect(ids).toEqual(["a:0", "a:1"]);
+    expect(r.unplaced).toHaveLength(0);
+    checkInvariants(r, kamaz, NO_GAP);
+  });
+
+  it("keep: сохранённый груз — валидная опора, соседи не пересекаются", () => {
+    const a = makeItem({ id: "a", quantity: 1, height: 600, stackable: true, maxTopLoad: 500 });
+    const b = makeItem({ id: "b", quantity: 3, height: 600, stackable: true, maxTopLoad: 500 });
+    ITEMS = [a, b];
+    const manual: Placement = {
+      id: "a:0",
+      itemId: "a",
+      unitIndex: 0,
+      x: 0,
+      y: 0,
+      z: 0,
+      yaw: 0,
+      axis: "up",
+      stopIndex: 0,
+    };
+    const r = packLayout(req({ items: ITEMS, keep: [manual] }));
+    expect(r.placements.filter((p) => p.itemId === "a")).toHaveLength(1);
+    expect(r.placements.filter((p) => p.itemId === "b")).toHaveLength(3);
+    expect(r.unplaced).toHaveLength(0);
+    checkInvariants(r, kamaz, NO_GAP);
+  });
 });

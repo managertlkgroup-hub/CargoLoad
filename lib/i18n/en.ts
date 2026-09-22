@@ -122,11 +122,17 @@ export const en: Record<string, string> = {
   "snap.off": "Off",
 
   "layer.title": "Layer",
+  "layer.n": "Layer {n}",
   "layer.all": "All layers",
   "layer.up": "Layer up",
   "layer.down": "Layer down",
   "layer.rotate": "Rotate 90°",
+  "layer.selectHint": "Select cargo",
+  "ctx.showLayer": "Show cargo layer",
+  "view.door": "Door",
+  "view.grid": "Grid",
   "legend.title": "Legend",
+  "legend.more": "{n} more",
   "dims.title": "Body dimensions",
 
   "hotkeys": "Keyboard shortcuts",

@@ -157,11 +157,38 @@ function effOverlap(
   );
 }
 
-/** Добавление точки с доминированием (Pareto): худшие отбрасываются. */
-function addPoint(pts: Pt[], p: Pt): void {
+/** Пересечение реальных боксов с допуском (касание разрешено) — для keep. */
+function realOverlap(
+  ax: number,
+  ay: number,
+  az: number,
+  adx: number,
+  ady: number,
+  adz: number,
+  b: { x: number; y: number; z: number; dx: number; dy: number; dz: number }
+): boolean {
+  return (
+    ax < b.x + b.dx - EPS &&
+    ax + adx > b.x + EPS &&
+    ay < b.y + b.dy - EPS &&
+    ay + ady > b.y + EPS &&
+    az < b.z + b.dz - EPS &&
+    az + adz > b.z + EPS
+  );
+}
+
+/**
+ * Добавление точки с доминированием (Pareto): худшие отбрасываются.
+ * Отброшенные можно собрать в rejected — они пригодятся как запасной
+ * набор, когда «лучшая» точка закрыта сохранённым грузом (keep).
+ */
+function addPoint(pts: Pt[], p: Pt, rejected?: Pt[]): void {
   const e = EPS;
   for (const q of pts) {
-    if (q.x <= p.x + e && q.y <= p.y + e && q.z <= p.z + e) return;
+    if (q.x <= p.x + e && q.y <= p.y + e && q.z <= p.z + e) {
+      rejected?.push(p);
+      return;
+    }
   }
   let i = 0;
   while (i < pts.length) {
@@ -234,39 +261,6 @@ export function packLayout(req: PackRequest): PackResult {
     });
   }
 
-  /* — разворот единиц — */
-  const units: Unit[] = [];
-  let totalUnits = 0;
-  outer: for (const item of items) {
-    for (let u = 0; u < item.quantity; u++) {
-      if (totalUnits >= MAX_UNITS) {
-        addUnplaced(item.id, item.quantity - u, "no-space");
-        break outer;
-      }
-      units.push({ item, unitIndex: u, stopIndex: item.stopIndex });
-      totalUnits++;
-    }
-  }
-
-  /* — сортировка: LIFO по стопам (при lifo последняя точка — глубже), затем крупные/тяжёлые — */
-  units.sort((a, b) => {
-    if (a.stopIndex !== b.stopIndex) {
-      return lifo ? b.stopIndex - a.stopIndex : a.stopIndex - b.stopIndex;
-    }
-    const ia = infoByItem.get(a.item.id)!;
-    const ib = infoByItem.get(b.item.id)!;
-    if (ia.volume !== ib.volume) return ib.volume - ia.volume;
-    if (ia.area !== ib.area) return ib.area - ia.area;
-    if (a.item.weight !== b.item.weight) return b.item.weight - a.item.weight;
-    return a.item.id < b.item.id ? -1 : a.item.id > b.item.id ? 1 : 0;
-  });
-
-  /* — слишком крупные грузы — */
-  for (const u of units) {
-    const info = infoByItem.get(u.item.id)!;
-    if (info.tooBig) addUnplaced(u.item.id, 1, "too-big");
-  }
-
   /* — якорь заполнения (в «пространственных» координатах после flipY) — */
   const anchorX = wall;
   const anchorY = wall;
@@ -274,7 +268,6 @@ export function packLayout(req: PackRequest): PackResult {
   const placed: Box[] = [];
   const grid = new Grid();
   const pts: Pt[] = [{ x: anchorX, y: anchorY, z: 0 }];
-  const placements: Placement[] = [];
   const itemById = new Map<string, CargoItem>(items.map((i) => [i.id, i]));
   let weightUsed = 0;
 
@@ -303,10 +296,136 @@ export function packLayout(req: PackRequest): PackResult {
   };
 
   /** Предложить точку: мёртвые не добавляются (и не могут «доминировать»). */
-  const offerPoint = (x: number, y: number, z: number) => {
+  const offerPoint = (x: number, y: number, z: number, rejected?: Pt[]) => {
     const q: Pt = { x, y, z };
-    if (!deadPoint(q)) addPoint(pts, q);
+    if (!deadPoint(q)) addPoint(pts, q, rejected);
   };
+
+  /* — сохранённые (ручные) размещения: keep — позиции, которые нельзя трогать
+     (перетаскивание, восстановление сессии/перезагрузки). Невалидные
+     отбрасываются и упаковываются как обычные единицы. — */
+  const keepKeys = new Set<string>();
+  const keptPlacements: Placement[] = [];
+  const keptZs: number[] = [];
+  /** отброшенные доминированием точки от keep — запасной набор кандидатов */
+  const keepFallback: Pt[] = [];
+  if (req.keep?.length) {
+    const sortedKeep = [...req.keep].sort(
+      (a, b) =>
+        a.z - b.z ||
+        a.x - b.x ||
+        a.y - b.y ||
+        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+    );
+    for (const k of sortedKeep) {
+      const item = itemById.get(k.itemId);
+      if (!item) continue;
+      if (k.unitIndex < 0 || k.unitIndex >= item.quantity) continue;
+      const key = `${k.itemId}:${k.unitIndex}`;
+      if (keepKeys.has(key)) continue;
+      const d = dimsFor(item, k.yaw, k.axis);
+      const sx = k.x;
+      const sy = flipY ? W - k.y - d.dy : k.y;
+      // границы — как при ручном перемещении: весь кузов, без зазоров стен
+      if (
+        sx < -EPS ||
+        sy < -EPS ||
+        sx + d.dx > L + EPS ||
+        sy + d.dy > W + EPS ||
+        k.z < -EPS ||
+        k.z + d.dz > H + EPS
+      ) {
+        continue;
+      }
+      // пересечение с уже принятыми (касание разрешено)
+      let clash = false;
+      for (const b of placed) {
+        if (realOverlap(sx, sy, k.z, d.dx, d.dy, d.dz, b)) {
+          clash = true;
+          break;
+        }
+      }
+      if (clash) continue;
+      if (keptZs[keptZs.length - 1] !== k.z) keptZs.push(k.z);
+      const box: Box = {
+        x: sx,
+        y: sy,
+        z: k.z,
+        dx: d.dx,
+        dy: d.dy,
+        dz: d.dz,
+        ex: d.dx + rowL,
+        ey: d.dy + rowW,
+        itemId: k.itemId,
+        unitIndex: k.unitIndex,
+        flatTop: !(item.shape === "cylinder" && k.axis === "side"),
+        layer: keptZs.indexOf(k.z),
+        loadAbove: 0,
+        supportShares: [],
+        supporters: [],
+      };
+      placed.push(box);
+      grid.insert(placed.length - 1, box);
+      keepKeys.add(key);
+      keptPlacements.push({
+        ...k,
+        x: Math.round(k.x),
+        y: Math.round(k.y),
+        z: Math.round(k.z),
+        stopIndex: item.stopIndex,
+      });
+      weightUsed += item.weight;
+    }
+    if (keptPlacements.length) {
+      // якорь и прежние точки могут быть заняты сохранённым грузом
+      for (let i = pts.length - 1; i >= 0; i--) {
+        if (deadPoint(pts[i])) pts.splice(i, 1);
+      }
+      for (const b of placed) {
+        offerPoint(b.x + b.dx + rowL, b.y, b.z, keepFallback);
+        offerPoint(b.x, b.y + b.dy + rowW, b.z, keepFallback);
+        offerPoint(b.x, b.y, b.z + b.dz, keepFallback);
+        offerPoint(b.x + b.dx + rowL, anchorY, b.z, keepFallback);
+        offerPoint(anchorX, b.y + b.dy + rowW, b.z, keepFallback);
+      }
+    }
+  }
+
+  /* — разворот единиц (сохранённые пропускаются) — */
+  const units: Unit[] = [];
+  let totalUnits = 0;
+  outer: for (const item of items) {
+    for (let u = 0; u < item.quantity; u++) {
+      if (keepKeys.has(`${item.id}:${u}`)) continue;
+      if (totalUnits >= MAX_UNITS) {
+        addUnplaced(item.id, item.quantity - u, "no-space");
+        break outer;
+      }
+      units.push({ item, unitIndex: u, stopIndex: item.stopIndex });
+      totalUnits++;
+    }
+  }
+
+  /* — сортировка: LIFO по стопам (при lifo последняя точка — глубже), затем крупные/тяжёлые — */
+  units.sort((a, b) => {
+    if (a.stopIndex !== b.stopIndex) {
+      return lifo ? b.stopIndex - a.stopIndex : a.stopIndex - b.stopIndex;
+    }
+    const ia = infoByItem.get(a.item.id)!;
+    const ib = infoByItem.get(b.item.id)!;
+    if (ia.volume !== ib.volume) return ib.volume - ia.volume;
+    if (ia.area !== ib.area) return ib.area - ia.area;
+    if (a.item.weight !== b.item.weight) return b.item.weight - a.item.weight;
+    return a.item.id < b.item.id ? -1 : a.item.id > b.item.id ? 1 : 0;
+  });
+
+  /* — слишком крупные грузы — */
+  for (const u of units) {
+    const info = infoByItem.get(u.item.id)!;
+    if (info.tooBig) addUnplaced(u.item.id, 1, "too-big");
+  }
+
+  const placements: Placement[] = [...keptPlacements];
 
   for (const unit of units) {
     const item = unit.item;
@@ -322,7 +441,7 @@ export function packLayout(req: PackRequest): PackResult {
     // сортировка точек: z, затем вдоль основной оси заполнения
     // (задняя/верхняя дверь — ряды вдоль X: сначала меньший Y;
     //  боковые двери — столбцы вдоль Y: сначала меньший X)
-    const validPts = pts.filter(
+    const validPts = (keepFallback.length ? [...pts, ...keepFallback] : pts).filter(
       (p) =>
         p.x < L - wall - EPS &&
         p.y < W - wall - EPS &&

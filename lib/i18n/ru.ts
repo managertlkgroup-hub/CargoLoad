@@ -123,11 +123,17 @@ export const ru: Record<string, string> = {
   "snap.off": "Выкл",
 
   "layer.title": "Слой",
+  "layer.n": "Слой {n}",
   "layer.all": "Все слои",
   "layer.up": "Поднять слой",
   "layer.down": "Опустить слой",
   "layer.rotate": "Повернуть 90°",
+  "layer.selectHint": "Выберите груз",
+  "ctx.showLayer": "Показать слой груза",
+  "view.door": "Дверь",
+  "view.grid": "Сетка",
   "legend.title": "Легенда",
+  "legend.more": "ещё {n}",
   "dims.title": "Размеры кузова",
 
   "hotkeys": "Горячие клавиши",

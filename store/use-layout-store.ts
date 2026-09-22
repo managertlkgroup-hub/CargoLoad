@@ -55,6 +55,13 @@ interface LayoutState {
   selectedIds: string[];
   packStatus: PackStatus;
   lastPackMs: number;
+  /**
+   * Ревизия явной пересборки раскладки (режим/зазоры/авто/стекинг/стопы).
+   * Ядро упаковки при неизменной ревизии работает в keep-режиме:
+   * ручные позиции и восстановленные сессии не затираются.
+   * Намеренно не сохраняется в localStorage (гидратация не пересобирает).
+   */
+  layoutRev: number;
   /** учитывать ли штабелирование при расчёте */
   stacking: boolean;
   /** LIFO-порядок для мульти-стопа */
@@ -141,6 +148,11 @@ function geomMap(items: CargoItem[]): Map<string, CargoItem> {
   return new Map(items.map((i) => [i.id, i]));
 }
 
+/** Текущий автомобиль из СВЕЖЕГО состояния (для вне-рендеровых чтений). */
+export function getCurrentVehicle(): ReturnType<typeof currentVehicle> {
+  return currentVehicle(useLayoutStore.getState());
+}
+
 const MOVE_ERRORS: Record<string, string> = {
   overlap: "Грузы пересекаются — перемещение отменено",
   bounds: "Груз выходит за габариты кузова — отменено",
@@ -164,6 +176,7 @@ export const useLayoutStore = create<LayoutState>()(
       selectedIds: [],
       packStatus: "idle",
       lastPackMs: 0,
+      layoutRev: 0,
       stacking: true,
       lifo: true,
       maxLayers: 0,
@@ -221,40 +234,46 @@ export const useLayoutStore = create<LayoutState>()(
             vehicle && !vehicle.loadingSides.includes(s.loadingSide)
               ? vehicle.defaultLoadingSide
               : s.loadingSide;
-          return { vehicleId: id, loadingSide };
+          return { vehicleId: id, loadingSide, layoutRev: s.layoutRev + 1 };
         });
       },
 
       setLoadingSide: (side) => {
         const v = currentVehicle(get());
         if (!v.loadingSides.includes(side)) return;
-        set({ loadingSide: side });
+        set((s) => ({ loadingSide: side, layoutRev: s.layoutRev + 1 }));
       },
 
       setMode: (mode) => {
         if (mode === get().mode) return;
         get().pushHistory();
-        set({ mode });
+        set((s) => ({ mode, layoutRev: s.layoutRev + 1 }));
       },
 
       setGaps: (mode, gaps) => {
         get().pushHistory();
-        set((s) => ({ gaps: { ...s.gaps, [mode]: gaps } }));
+        set((s) => ({
+          gaps: { ...s.gaps, [mode]: gaps },
+          layoutRev: s.layoutRev + 1,
+        }));
       },
 
       setStacking: (stacking) => {
         get().pushHistory();
-        set({ stacking });
+        set((s) => ({ stacking, layoutRev: s.layoutRev + 1 }));
       },
 
       setLifo: (lifo) => {
         get().pushHistory();
-        set({ lifo });
+        set((s) => ({ lifo, layoutRev: s.layoutRev + 1 }));
       },
 
       setMaxLayers: (maxLayers) => {
         get().pushHistory();
-        set({ maxLayers: Math.max(0, Math.round(maxLayers)) });
+        set((s) => ({
+          maxLayers: Math.max(0, Math.round(maxLayers)),
+          layoutRev: s.layoutRev + 1,
+        }));
       },
 
       setPackResult: (result, ms) => {
