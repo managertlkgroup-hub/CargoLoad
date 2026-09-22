@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, Truck } from "lucide-react";
+import { Check, ChevronDown, LayoutGrid, Pencil, Truck } from "lucide-react";
 
 import { useT } from "@/hooks/use-t";
 import { useVehicle } from "@/hooks/use-vehicle";
@@ -12,6 +12,8 @@ import { useUiStore } from "@/store/use-ui-store";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -21,6 +23,7 @@ export function VehicleSelect() {
   const vehicle = useVehicle();
   const vehicles = useVehicles();
   const setVehicle = useLayoutStore((s) => s.setVehicle);
+  const openDialog = useUiStore((s) => s.openDialog);
   const locale = useUiStore((s) => s.locale);
   const lengthUnit = useUiStore((s) => s.lengthUnit);
   const weightUnit = useUiStore((s) => s.weightUnit);
@@ -95,6 +98,15 @@ export function VehicleSelect() {
             </button>
           );
         })}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => openDialog({ kind: "vehiclePicker" })}>
+          <LayoutGrid className="size-4 text-accent" />
+          {t("vehicle.catalog")}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => openDialog({ kind: "vehiclePreset", presetId: vehicle.id })}>
+          <Pencil className="size-4" />
+          {t("vehicle.editCurrent")}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

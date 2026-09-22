@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Boxes, Copy, Layers, Plus, Trash2, X } from "lucide-react";
+import { Boxes, Copy, Layers, Pencil, Plus, SlidersHorizontal, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { useCargoPresets } from "@/hooks/use-presets";
@@ -35,6 +35,7 @@ export function LeftPanel({ onClose }: { onClose?: () => void }) {
   const duplicateItems = useLayoutStore((s) => s.duplicateItems);
   const removeItems = useLayoutStore((s) => s.removeItems);
   const clearSelection = useLayoutStore((s) => s.clearSelection);
+  const openDialog = useUiStore((s) => s.openDialog);
   const presets = useCargoPresets();
 
   const totalWeight = items.reduce((s, i) => s + i.weight * i.quantity, 0);
@@ -59,6 +60,15 @@ export function LeftPanel({ onClose }: { onClose?: () => void }) {
           </span>
         </div>
         <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={t("presets.manage")}
+            title={t("presets.manage")}
+            onClick={() => openDialog({ kind: "presets", tab: "cargo" })}
+          >
+            <SlidersHorizontal className="size-4" />
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="sm" aria-label={t("cargo.add")}>
@@ -117,6 +127,10 @@ export function LeftPanel({ onClose }: { onClose?: () => void }) {
             </div>
             <p className="text-sm font-medium text-fg-2">{t("cargo.empty.title")}</p>
             <p className="text-xs leading-relaxed text-muted">{t("cargo.empty.text")}</p>
+            <Button size="sm" onClick={() => openDialog({ kind: "cargo" })}>
+              <Plus className="size-3.5" />
+              {t("cargo.empty.cta")}
+            </Button>
           </div>
         ) : (
           <ul className="flex flex-col gap-1.5">
@@ -131,6 +145,7 @@ export function LeftPanel({ onClose }: { onClose?: () => void }) {
                     duplicateItems([item.id]);
                     toast(t("toast.duplicated"));
                   }}
+                  onEdit={() => openDialog({ kind: "cargo", itemId: item.id })}
                   onDelete={() => {
                     removeItems([item.id]);
                     clearSelection();
@@ -166,6 +181,7 @@ function CargoRow({
   selected,
   onSelect,
   onDuplicate,
+  onEdit,
   onDelete,
   dimsText,
   weightText,
@@ -174,6 +190,7 @@ function CargoRow({
   selected: boolean;
   onSelect: (additive: boolean) => void;
   onDuplicate: () => void;
+  onEdit: () => void;
   onDelete: () => void;
   dimsText: string;
   weightText: string;
@@ -208,6 +225,17 @@ function CargoRow({
         </div>
       </div>
       <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Изменить"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit();
+          }}
+        >
+          <Pencil className="size-3.5" />
+        </Button>
         <Button
           variant="ghost"
           size="icon-sm"

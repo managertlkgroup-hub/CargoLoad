@@ -4,9 +4,11 @@ import {
   AlignEndHorizontal,
   Columns3,
   LayoutGrid,
+  Library,
   PanelLeft,
   PanelRight,
   Redo2,
+  Save,
   Trash2,
   Undo2,
 } from "lucide-react";
@@ -52,6 +54,7 @@ export function TopBar() {
   const rightOpen = useUiStore((s) => s.rightPanelOpen);
   const setLeft = useUiStore((s) => s.setLeftPanel);
   const setRight = useUiStore((s) => s.setRightPanel);
+  const openDialog = useUiStore((s) => s.openDialog);
 
   return (
     <header className="glass sticky top-0 z-40 m-3 mb-0 rounded-2xl px-3 py-2.5">
@@ -136,6 +139,34 @@ export function TopBar() {
               { value: "3d", label: t("view.3d") },
             ]}
           />
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t("presets.manage")}
+                onClick={() => openDialog({ kind: "presets" })}
+              >
+                <Library className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t("presets.manage")}</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t("action.sessions")}
+                onClick={() => openDialog({ kind: "sessions" })}
+              >
+                <Save className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t("action.sessions")}</TooltipContent>
+          </Tooltip>
 
           <AlertDialog>
             <AlertDialogTrigger asChild>

@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useHotkeys } from "@/hooks/use-hotkeys";
 import { usePackEngine } from "@/hooks/use-pack-engine";
 import { StoreHydrator } from "@/components/store-hydrator";
+import { Dialogs } from "@/components/dialogs";
 import { TopBar } from "@/components/layout/top-bar";
 import { LeftPanel } from "@/components/layout/left-panel";
 import { RightPanel } from "@/components/layout/right-panel";
@@ -30,6 +31,7 @@ export function AppShell() {
     <div className="flex min-h-dvh flex-col">
       <StoreHydrator />
       <TopBar />
+      <Dialogs />
 
       <main className="relative flex min-h-0 flex-1 gap-3 p-3">
         {/* десктопные колонки (на мобильных — выдвижные шторки ниже) */}
