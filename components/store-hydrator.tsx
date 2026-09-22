@@ -18,6 +18,13 @@ export function StoreHydrator() {
     void useUiStore.persist.rehydrate();
     void usePresetsStore.persist.rehydrate();
     void useSessionsStore.persist.rehydrate();
+
+    // на узких экранах панели-шторки закрыты по умолчанию
+    const narrow = window.matchMedia("(max-width: 1023px)");
+    if (narrow.matches) {
+      useUiStore.getState().setLeftPanel(false);
+      useUiStore.getState().setRightPanel(false);
+    }
   }, []);
   return null;
 }

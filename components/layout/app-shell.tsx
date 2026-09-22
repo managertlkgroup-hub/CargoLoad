@@ -9,6 +9,7 @@ import { TopBar } from "@/components/layout/top-bar";
 import { LeftPanel } from "@/components/layout/left-panel";
 import { RightPanel } from "@/components/layout/right-panel";
 import { ViewHost } from "@/components/views/view-host";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { useUiStore } from "@/store/use-ui-store";
 
 /**
@@ -19,6 +20,7 @@ export function AppShell() {
   useHotkeys();
   usePackEngine();
 
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
   const leftOpen = useUiStore((s) => s.leftPanelOpen);
   const rightOpen = useUiStore((s) => s.rightPanelOpen);
   const setLeft = useUiStore((s) => s.setLeftPanel);
@@ -63,51 +65,51 @@ export function AppShell() {
         )}
       </main>
 
-      {/* мобильные шторки */}
+      {/* мобильные шторки (только на узких экранах) */}
       <AnimatePresence>
-        {leftOpen && (
-          <>
-            <motion.div
-              key="left-backdrop"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setLeft(false)}
-              className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px] lg:hidden"
-            />
-            <motion.div
-              key="left-drawer"
-              initial={{ x: "-100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "-100%" }}
-              transition={{ type: "spring", stiffness: 380, damping: 36 }}
-              className="fixed inset-y-2 left-2 z-50 w-[86vw] max-w-[340px] lg:hidden"
-            >
-              <LeftPanel onClose={() => setLeft(false)} />
-            </motion.div>
-          </>
+        {leftOpen && !isDesktop && (
+          <motion.div
+            key="left-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setLeft(false)}
+            className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px]"
+          />
         )}
-        {rightOpen && (
-          <>
-            <motion.div
-              key="right-backdrop"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setRight(false)}
-              className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px] lg:hidden"
-            />
-            <motion.div
-              key="right-drawer"
-              initial={{ x: "100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "spring", stiffness: 380, damping: 36 }}
-              className="fixed inset-y-2 right-2 z-50 w-[86vw] max-w-[340px] lg:hidden"
-            >
-              <RightPanel onClose={() => setRight(false)} />
-            </motion.div>
-          </>
+        {leftOpen && !isDesktop && (
+          <motion.div
+            key="left-drawer"
+            initial={{ x: "-100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "-100%" }}
+            transition={{ type: "spring", stiffness: 380, damping: 36 }}
+            className="fixed inset-y-2 left-2 z-50 w-[86vw] max-w-[340px]"
+          >
+            <LeftPanel onClose={() => setLeft(false)} />
+          </motion.div>
+        )}
+        {rightOpen && !isDesktop && (
+          <motion.div
+            key="right-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setRight(false)}
+            className="fixed inset-0 z-40 bg-black/45 backdrop-blur-[2px]"
+          />
+        )}
+        {rightOpen && !isDesktop && (
+          <motion.div
+            key="right-drawer"
+            initial={{ x: "100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "100%" }}
+            transition={{ type: "spring", stiffness: 380, damping: 36 }}
+            className="fixed inset-y-2 right-2 z-50 w-[86vw] max-w-[340px]"
+          >
+            <RightPanel onClose={() => setRight(false)} />
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
