@@ -13,7 +13,8 @@ export type DialogState =
   | { kind: "sessions" }
   | { kind: "vehiclePicker" }
   | { kind: "vehicleFit" }
-  | { kind: "import" };
+  | { kind: "import" }
+  | { kind: "share" };
 
 interface UiState {
   locale: Locale;

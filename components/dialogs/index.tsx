@@ -4,6 +4,7 @@ import { CargoDialog } from "@/components/dialogs/cargo-dialog";
 import { ImportDialog } from "@/components/dialogs/import-dialog";
 import { PresetsDialog } from "@/components/dialogs/presets-dialog";
 import { SessionsDialog } from "@/components/dialogs/sessions-dialog";
+import { ShareDialog } from "@/components/dialogs/share-dialog";
 import { VehicleDialog } from "@/components/dialogs/vehicle-dialog";
 import { VehicleFitDialog } from "@/components/dialogs/vehicle-fit-dialog";
 import { VehiclePickerDialog } from "@/components/dialogs/vehicle-picker-dialog";
@@ -19,6 +20,7 @@ export function Dialogs() {
       <ImportDialog />
       <PresetsDialog />
       <SessionsDialog />
+      <ShareDialog />
     </>
   );
 }

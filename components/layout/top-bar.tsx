@@ -13,6 +13,7 @@ import {
   PanelRight,
   Redo2,
   Save,
+  Share2,
   Trash2,
   Undo2,
 } from "lucide-react";
@@ -232,6 +233,20 @@ export function TopBar() {
               </Button>
             </TooltipTrigger>
             <TooltipContent>{t("action.sessions")}</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t("share.title")}
+                onClick={() => openDialog({ kind: "share" })}
+              >
+                <Share2 className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t("share.title")}</TooltipContent>
           </Tooltip>
 
           <AlertDialog>

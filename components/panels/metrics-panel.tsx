@@ -13,7 +13,10 @@ import {
 
 import { AnimatedNumber } from "@/components/panels/animated-number";
 import { useUiStore } from "@/store/use-ui-store";
+import { useLayoutStore } from "@/store/use-layout-store";
 import { useT } from "@/hooks/use-t";
+import { useVehicle } from "@/hooks/use-vehicle";
+import { recommendVehicleCount } from "@/lib/advanced/vehicle-selector";
 import { cn } from "@/lib/utils";
 import {
   formatLength,
@@ -42,6 +45,9 @@ export function MetricsPanel({ metrics }: { metrics: LoadMetrics }) {
   const locale = useUiStore((s) => s.locale);
   const lengthUnit = useUiStore((s) => s.lengthUnit);
   const weightUnit = useUiStore((s) => s.weightUnit);
+  const vehicle = useVehicle();
+  const items = useLayoutStore((s) => s.items);
+  const fleet = items.length ? recommendVehicleCount(items, vehicle) : null;
 
   const lenFmt = (v: number) => formatLength(v, lengthUnit, locale);
   const pctFmt = (v: number) => `${formatNumber(v, 1, locale)} %`;
@@ -108,6 +114,14 @@ export function MetricsPanel({ metrics }: { metrics: LoadMetrics }) {
             />
           </span>
         </div>
+        {fleet && (
+          <div className="mt-1.5 flex items-center justify-between border-t border-border/60 pt-1.5 text-[11.5px]">
+            <span className="text-muted">{t("metric.vehicles")}</span>
+            <span className="tnum font-semibold text-primary">
+              <AnimatedNumber value={fleet.count} format={(v) => formatNumber(v, 0, locale)} />
+            </span>
+          </div>
+        )}
       </Card>
 
       {/* габариты укладки */}

@@ -9,6 +9,7 @@ import { DEFAULT_VEHICLE_ID } from "@/lib/constants";
 import type { ExportModel } from "@/lib/export/model";
 import type { MetricsLabels } from "@/lib/export/png";
 import type { XlsxTexts } from "@/lib/export/xlsx";
+import { strappingPlan } from "@/lib/advanced/en12195";
 import { dimsFor } from "@/lib/geometry";
 import { translate } from "@/lib/i18n";
 import { findVehicle } from "@/lib/presets/select";
@@ -199,6 +200,12 @@ function buildPdfData(m: ExportModel): PdfData {
       };
     });
 
+  const totalMass = m.items.reduce((sum, i) => sum + i.weight * i.quantity, 0);
+  const strapping: PdfData["strapping"] =
+    totalMass > 0
+      ? buildStrappingData(m, totalMass, s, n)
+      : null;
+
   return {
     title: s("app.tagline"),
     subtitle: `${v.name} · ${s(`mode.${m.mode}`)}`,
@@ -211,9 +218,11 @@ function buildPdfData(m: ExportModel): PdfData {
       goods: s("export.section.goods"),
       schemes: s("export.section.schemes"),
       instructions: s("export.section.instructions"),
+      strapping: s("export.section.strapping"),
     },
     params,
     metrics,
+    strapping,
     goods,
     goodsHeader: {
       name: s("cargo.field.name"),
@@ -232,6 +241,35 @@ function buildPdfData(m: ExportModel): PdfData {
       ],
     },
     footer: `${s("app.tagline")} · CargoPlanner`,
+  };
+}
+
+/* ----------------------------- PDF: крепление груза ----------------------------- */
+
+function buildStrappingData(
+  m: ExportModel,
+  totalMass: number,
+  s: (k: string, vars?: Record<string, string | number>) => string,
+  n: (v: number, d?: number) => string
+): PdfData["strapping"] {
+  const plan = strappingPlan({ massKg: totalMass });
+  const kg = (v: number) => formatWeight(v, m.weightUnit, m.locale);
+  const daN = s("en12195.daN");
+  return {
+    rows: [
+      { label: s("en12195.mass"), value: kg(totalMass) },
+      { label: s("en12195.lc"), value: `${n(plan.requiredLC, 0)} ${daN}` },
+      {
+        label: s("en12195.straps"),
+        value: `${n(plan.strapCount, 0)} × ${n(plan.strapLC, 0)} ${daN}`,
+        tone: plan.strapCount >= 3 ? "warn" : undefined,
+      },
+      {
+        label: s("en12195.mu"),
+        value: `${n(plan.mu, 2)} · ${s("en12195.wood")}`,
+      },
+    ],
+    note: s("en12195.note"),
   };
 }
 

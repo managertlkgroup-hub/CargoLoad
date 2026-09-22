@@ -47,9 +47,14 @@ export interface PdfData {
     goods: string;
     schemes: string;
     instructions: string;
+    strapping: string;
   };
   params: Array<{ label: string; value: string }>;
   metrics: Array<{ label: string; value: string; tone?: "ok" | "warn" | "crit" }>;
+  strapping: {
+    rows: Array<{ label: string; value: string; tone?: "ok" | "warn" | "crit" }>;
+    note: string;
+  } | null;
   goods: Array<{
     name: string;
     color: string;
@@ -148,6 +153,8 @@ export function PdfDocument({ data }: { data: PdfData }) {
           </View>
         )}
 
+        {data.strapping && <StrappingSection data={data} />}
+
         {data.goods.length > 0 && <GoodsSection data={data} />}
 
         {data.layers.length > 0 && <SchemesSection data={data} />}
@@ -164,6 +171,35 @@ export function PdfDocument({ data }: { data: PdfData }) {
         <Text style={styles.footer}>{data.footer}</Text>
       </Page>
     </Document>
+  );
+}
+
+function StrappingSection({ data }: { data: PdfData }) {
+  if (!data.strapping) return null;
+  return (
+    <View style={styles.section} wrap={false}>
+      <Text style={styles.h2}>{data.sections.strapping}</Text>
+      <View style={styles.grid}>
+        {data.strapping.rows.map((r) => (
+          <View key={r.label} style={styles.gridItem}>
+            <View style={styles.row}>
+              <Text style={styles.label}>{r.label}</Text>
+              <Text
+                style={[
+                  styles.value,
+                  r.tone === "ok" ? styles.toneOk : undefined,
+                  r.tone === "warn" ? styles.toneWarn : undefined,
+                  r.tone === "crit" ? styles.toneCrit : undefined,
+                ]}
+              >
+                {r.value}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </View>
+      <Text style={styles.note}>{data.strapping.note}</Text>
+    </View>
   );
 }
 

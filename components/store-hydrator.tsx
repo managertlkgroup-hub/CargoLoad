@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect } from "react";
+import { toast } from "sonner";
 
+import { parseHash } from "@/lib/advanced/share";
+import { translate } from "@/lib/i18n";
 import { useLayoutStore } from "@/store/use-layout-store";
 import { usePresetsStore } from "@/store/use-presets-store";
 import { useSessionsStore } from "@/store/use-sessions-store";
@@ -26,6 +29,15 @@ export function StoreHydrator() {
       usePresetsStore.persist.rehydrate(),
       useSessionsStore.persist.rehydrate(),
     ]).then(() => {
+      // восстановление раскладки из share-ссылки (#s=…) поверх локального стора
+      const shared = parseHash(window.location.hash);
+      if (shared) {
+        useLayoutStore.getState().replaceSession(shared);
+        history.replaceState(null, "", window.location.pathname + window.location.search);
+        toast.success(
+          translate(useUiStore.getState().locale, "toast.shareRestored")
+        );
+      }
       // на узких экранах панели-шторки закрыты по умолчанию
       if (window.matchMedia("(max-width: 1023px)").matches) {
         useUiStore.getState().setLeftPanel(false);
