@@ -6,8 +6,7 @@ import { toast } from "sonner";
 
 import { useCargoPresets, useVehicles } from "@/hooks/use-presets";
 import { useT } from "@/hooks/use-t";
-import { formatLength, formatWeight } from "@/lib/units";
-import { cn } from "@/lib/utils";
+import { formatLength, formatWeight, lengthUnitLabel } from "@/lib/units";
 import { usePresetsStore } from "@/store/use-presets-store";
 import { useUiStore } from "@/store/use-ui-store";
 import { Button } from "@/components/ui/button";
@@ -19,6 +18,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import type { CargoPreset } from "@/types";
 
 type Tab = "cargo" | "vehicle";
 
@@ -219,14 +220,13 @@ function CargoPresets({ confirmId, setConfirmId, onNew, onEdit }: SectionProps) 
           {builtin.map((p) => {
             const name = locale === "en" ? p.nameEn || p.name : p.name;
             return (
-              <PresetRow key={p.id} color={p.data.color} name={name}>
-                <span className="tnum truncate text-[11px] text-muted">
-                  {p.data.shape === "cylinder"
-                    ? `Ø${formatLength(p.data.diameter, lengthUnit, locale)} × ${formatLength(p.data.length, lengthUnit, locale)}`
-                    : `${formatLength(p.data.length, lengthUnit, locale)} × ${formatLength(p.data.width, lengthUnit, locale)} × ${formatLength(p.data.height, lengthUnit, locale)}`}
-                  {" · "}
-                  {formatWeight(p.data.weight, weightUnit, locale)}
-                </span>
+              <PresetRow
+                key={p.id}
+                color={p.data.color}
+                name={name}
+                dims={cargoDimsText(p, lengthUnit, locale)}
+                weight={formatWeight(p.data.weight, weightUnit, locale)}
+              >
                 <PresetActions
                   id={p.id}
                   name={name}
@@ -258,14 +258,13 @@ function CargoPresets({ confirmId, setConfirmId, onNew, onEdit }: SectionProps) 
             {custom.map((p) => {
               const name = locale === "en" ? p.nameEn || p.name : p.name;
               return (
-                <PresetRow key={p.id} color={p.data.color} name={name}>
-                  <span className="tnum truncate text-[11px] text-muted">
-                    {formatLength(p.data.length, lengthUnit, locale)} ×{" "}
-                    {formatLength(p.data.width, lengthUnit, locale)} ×{" "}
-                    {formatLength(p.data.height, lengthUnit, locale)}
-                    {" · "}
-                    {formatWeight(p.data.weight, weightUnit, locale)}
-                  </span>
+                <PresetRow
+                  key={p.id}
+                  color={p.data.color}
+                  name={name}
+                  dims={cargoDimsText(p, lengthUnit, locale)}
+                  weight={formatWeight(p.data.weight, weightUnit, locale)}
+                >
                   <PresetActions
                     id={p.id}
                     name={name}
@@ -306,43 +305,52 @@ function VehiclePresets({ confirmId, setConfirmId, onNew, onEdit }: SectionProps
 
   const row = (v: (typeof vehicles)[number], isBuiltin: boolean) => {
     const name = locale === "en" ? v.nameEn || v.name : v.name;
+    const dims = `${v.bodyType} · ${formatLength(v.innerLength, lengthUnit, locale, false)} × ${formatLength(
+      v.innerWidth,
+      lengthUnit,
+      locale,
+      false
+    )} × ${formatLength(v.innerHeight, lengthUnit, locale, false)} ${lengthUnitLabel(
+      lengthUnit,
+      locale
+    )} · ${formatWeight(v.payload, weightUnit, locale)}`;
     return (
-      <li
-        key={v.id}
-        className="group/row flex items-center gap-3 rounded-xl border border-border bg-panel-soft/60 p-2.5 transition-all duration-150 hover:border-border-strong hover:bg-panel"
-      >
-        <span
-          className="size-8 shrink-0 rounded-lg"
-          style={{ background: "linear-gradient(135deg, var(--accent), var(--primary))" }}
-          aria-hidden
-        />
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-[13px] font-medium text-fg">{name}</div>
-          <div className="tnum truncate text-[11px] text-muted">
-            {v.bodyType} · {formatLength(v.innerLength, lengthUnit, locale)} ×{" "}
-            {formatLength(v.innerWidth, lengthUnit, locale)} ×{" "}
-            {formatLength(v.innerHeight, lengthUnit, locale)} ·{" "}
-            {formatWeight(v.payload, weightUnit, locale)}
-          </div>
-        </div>
-        <PresetActions
-          id={v.id}
-          name={name}
-          builtin={isBuiltin}
-          overridden={!!vehicleOverrides[v.id]}
-          confirmId={confirmId}
-          setConfirmId={setConfirmId}
-          onEdit={onEdit}
-          onDelete={(id) => {
-            deleteCustomVehicle(id);
-            toast(t("toast.presetDeleted"));
-          }}
-          resetLabel={(id) => {
-            resetVehicle(id);
-            toast(t("toast.vehicleReset"));
-          }}
-        />
-      </li>
+      <Tooltip key={v.id}>
+        <TooltipTrigger asChild>
+          <li className="group/row flex items-center gap-3 rounded-xl border border-border bg-panel-soft/60 p-2.5 transition-all duration-150 hover:border-border-strong hover:bg-panel">
+            <span
+              className="size-8 shrink-0 rounded-lg"
+              style={{ background: "linear-gradient(135deg, var(--accent), var(--primary))" }}
+              aria-hidden
+            />
+            <div className="min-w-0 flex-1">
+              <div className="break-words text-[13px] font-medium leading-snug text-fg">{name}</div>
+              <div className="tnum break-words text-[11px] leading-snug text-muted">{dims}</div>
+            </div>
+            <PresetActions
+              id={v.id}
+              name={name}
+              builtin={isBuiltin}
+              overridden={!!vehicleOverrides[v.id]}
+              confirmId={confirmId}
+              setConfirmId={setConfirmId}
+              onEdit={onEdit}
+              onDelete={(id) => {
+                deleteCustomVehicle(id);
+                toast(t("toast.presetDeleted"));
+              }}
+              resetLabel={(id) => {
+                resetVehicle(id);
+                toast(t("toast.vehicleReset"));
+              }}
+            />
+          </li>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-[280px]">
+          <p className="font-semibold">{name}</p>
+          <p className="tnum text-muted">{dims}</p>
+        </TooltipContent>
+      </Tooltip>
     );
   };
 
@@ -366,26 +374,70 @@ function VehiclePresets({ confirmId, setConfirmId, onNew, onEdit }: SectionProps
   );
 }
 
+/** Габариты пресета в текущих единицах: «1200 × 1000 × 1600 мм» / «Ø570 × 880 мм». */
+function cargoDimsText(
+  p: CargoPreset,
+  unit: "mm" | "cm" | "m",
+  locale: "ru" | "en"
+): string {
+  const u = lengthUnitLabel(unit, locale);
+  if (p.data.shape === "cylinder") {
+    return `Ø${formatLength(p.data.diameter, unit, locale, false)} × ${formatLength(
+      p.data.length,
+      unit,
+      locale,
+      false
+    )} ${u}`;
+  }
+  return `${formatLength(p.data.length, unit, locale, false)} × ${formatLength(
+    p.data.width,
+    unit,
+    locale,
+    false
+  )} × ${formatLength(p.data.height, unit, locale, false)} ${u}`;
+}
+
 function PresetRow({
   color,
   name,
+  dims,
+  weight,
   children,
 }: {
   color: string;
   name: string;
+  dims: string;
+  weight?: string;
   children: ReactNode;
 }) {
   return (
-    <li className="group/row flex items-center gap-3 rounded-xl border border-border bg-panel-soft/60 p-2.5 transition-all duration-150 hover:border-border-strong hover:bg-panel">
-      <span
-        className="size-8 shrink-0 rounded-lg shadow-[0_2px_10px_-3px_rgba(0,0,0,0.4)]"
-        style={{ background: `linear-gradient(135deg, ${color}, ${color}aa)` }}
-        aria-hidden
-      />
-      <div className="min-w-0 flex-1">
-        <div className={cn("truncate text-[13px] font-medium text-fg")}>{name}</div>
-      </div>
-      {children}
-    </li>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <li className="group/row flex items-center gap-3 rounded-xl border border-border bg-panel-soft/60 p-2.5 transition-all duration-150 hover:border-border-strong hover:bg-panel">
+          <span
+            className="size-8 shrink-0 rounded-lg shadow-[0_2px_10px_-3px_rgba(0,0,0,0.4)]"
+            style={{ background: `linear-gradient(135deg, ${color}, ${color}aa)` }}
+            aria-hidden
+          />
+          <div className="min-w-0 flex-1">
+            <div className="break-words text-[13px] font-medium leading-snug text-fg">
+              {name}
+            </div>
+            <div className="tnum break-words text-[11px] leading-snug text-muted">
+              {dims}
+              {weight ? ` · ${weight}` : ""}
+            </div>
+          </div>
+          {children}
+        </li>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-[280px]">
+        <p className="font-semibold">{name}</p>
+        <p className="tnum text-muted">
+          {dims}
+          {weight ? ` · ${weight}` : ""}
+        </p>
+      </TooltipContent>
+    </Tooltip>
   );
 }

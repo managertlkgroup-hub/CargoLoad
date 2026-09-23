@@ -7,7 +7,6 @@ import {
   FileSpreadsheet,
   FileText,
   LayoutGrid,
-  Library,
   Loader2,
   PanelLeft,
   PanelRight,
@@ -205,20 +204,6 @@ export function TopBar() {
               </Button>
             </TooltipTrigger>
             <TooltipContent>{t("export.excel")}</TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={t("presets.manage")}
-                onClick={() => openDialog({ kind: "presets" })}
-              >
-                <Library className="size-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{t("presets.manage")}</TooltipContent>
           </Tooltip>
 
           <Tooltip>

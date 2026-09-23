@@ -152,14 +152,14 @@ describe("serialization: шаринг (base64url, кириллица, хэш)", 
     stops: [{ id: "stop.1", name: "Основная доставка" }],
   };
 
-  it("encodeShare → decodeShare: данные не теряются", () => {
-    const encoded = encodeShare(session);
+  it("encodeShare → decodeShare: данные не теряются", async () => {
+    const encoded = await encodeShare(session);
     const payload = encoded.slice(2);
     expect(encoded.startsWith("s=")).toBe(true);
     // base64url: без паддинга, без '+' и '/'
     expect(/^[A-Za-z0-9_-]+$/.test(payload)).toBe(true);
     expect(payload).not.toContain("=");
-    const decoded = decodeShare(encoded);
+    const decoded = await decodeShare(encoded);
     expect(decoded).not.toBeNull();
     expect(decoded!.vehicleId).toBe("vehicle.euro");
     expect(decoded!.items).toHaveLength(1);
@@ -168,35 +168,36 @@ describe("serialization: шаринг (base64url, кириллица, хэш)", 
     expect(decoded!.gaps).toEqual(DEFAULT_GAPS);
   });
 
-  it("parseHash: извлекает и декодирует #s=...", () => {
+  it("parseHash: извлекает и декодирует #s=...", async () => {
     // shareUrl нужен globalThis.location (в node нет) — подкладываем
     (globalThis as Record<string, unknown>).location = {
       origin: "https://cargo.example",
       pathname: "/app",
     };
-    const url = shareUrl(session);
+    const url = await shareUrl(session);
     expect(url.startsWith("https://cargo.example/app#s=")).toBe(true);
     const hash = url.slice(url.indexOf("#"));
-    const parsed = parseHash(hash);
+    const parsed = await parseHash(hash);
     expect(parsed).not.toBeNull();
     expect(parsed!.vehicleId).toBe("vehicle.euro");
     expect(parsed!.items[0].name).toMatch(/[а-яА-ЯёЁ]/);
   });
 
-  it("мусорный хэш: parseHash не падает и возвращает null", () => {
-    expect(parseHash("#s=%%%not-base64%%%")).toBeNull();
-    expect(parseHash("#other=1")).toBeNull();
-    expect(parseHash("")).toBeNull();
+  it("мусорный хэш: parseHash не падает и возвращает null", async () => {
+    expect(await parseHash("#s=%%%not-base64%%%")).toBeNull();
+    expect(await parseHash("#other=1")).toBeNull();
+    expect(await parseHash("")).toBeNull();
+    expect(await parseHash("#s=rO0ADw")).toBeNull();
   });
 
-  it("shareUrl ставит # перед параметром, URL декодируется обратно", () => {
+  it("shareUrl ставит # перед параметром, URL декодируется обратно", async () => {
     (globalThis as Record<string, unknown>).location = {
       origin: "https://cargo.example",
       pathname: "/app",
     };
-    const url = shareUrl(session);
+    const url = await shareUrl(session);
     expect(url.startsWith("https://cargo.example/app#s=")).toBe(true);
-    const parsed = parseHash(url.slice(url.indexOf("#")));
+    const parsed = await parseHash(url.slice(url.indexOf("#")));
     expect(parsed).not.toBeNull();
     expect(parsed!.vehicleId).toBe("vehicle.euro");
     expect(parsed!.stops).toEqual(session.stops);

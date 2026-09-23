@@ -28,19 +28,20 @@ export function AppShell() {
   const setRight = useUiStore((s) => s.setRightPanel);
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex h-dvh flex-col overflow-hidden">
       <StoreHydrator />
       <TopBar />
       <Dialogs />
 
-      <main className="relative flex min-h-0 flex-1 gap-3 p-3">
+      {/* grid h-dvh: три колонки со своими скроллами, страница не прокручивается */}
+      <main className="grid min-h-0 flex-1 grid-cols-[auto_minmax(0,1fr)_auto] gap-3 p-3">
         {/* десктопные колонки (на мобильных — выдвижные шторки ниже) */}
         {leftOpen && (
           <motion.div
             initial={{ opacity: 0, x: -18 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.4, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
-            className="hidden min-h-0 lg:block"
+            className="col-start-1 hidden min-h-0 lg:block"
           >
             <LeftPanel />
           </motion.div>
@@ -50,7 +51,7 @@ export function AppShell() {
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-          className="glass relative min-h-[440px] min-w-0 flex-1 overflow-hidden rounded-2xl lg:min-h-0"
+          className="glass relative col-start-2 min-h-0 min-w-0 overflow-hidden rounded-2xl"
         >
           <ViewHost />
         </motion.section>
@@ -60,7 +61,7 @@ export function AppShell() {
             initial={{ opacity: 0, x: 18 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.4, delay: 0.05, ease: [0.22, 1, 0.36, 1] }}
-            className="hidden min-h-0 lg:block"
+            className="col-start-3 hidden min-h-0 lg:block"
           >
             <RightPanel />
           </motion.div>

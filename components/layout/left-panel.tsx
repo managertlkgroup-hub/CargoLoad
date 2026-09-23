@@ -78,14 +78,26 @@ export function LeftPanel({ onClose }: { onClose?: () => void }) {
           >
             <SlidersHorizontal className="size-4" />
           </Button>
+          {onClose && (
+            <Button variant="ghost" size="icon-sm" className="lg:hidden" onClick={onClose}>
+              <X className="size-4" />
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* список */}
+      <ScrollArea className="min-h-0 flex-1 px-3 py-3">
+        {/* «Добавить груз» закреплён вверху списка — виден и доступен всегда */}
+        <div className="sticky top-0 z-10 -mx-3 mb-2 border-b border-border/60 bg-panel-strong/85 px-3 pb-2 pt-1.5 backdrop-blur-md">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="sm" aria-label={t("cargo.add")}>
+              <Button size="sm" className="w-full" aria-label={t("cargo.add")}>
                 <Plus className="size-3.5" />
                 {t("cargo.add")}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="max-h-[60vh] w-[290px] overflow-y-auto">
+            <DropdownMenuContent align="start" className="max-h-[60vh] w-[290px] overflow-y-auto">
               <DropdownMenuLabel>{t("cargo.presets")}</DropdownMenuLabel>
               {presets
                 .filter((p) => p.builtin)
@@ -119,16 +131,8 @@ export function LeftPanel({ onClose }: { onClose?: () => void }) {
               )}
             </DropdownMenuContent>
           </DropdownMenu>
-          {onClose && (
-            <Button variant="ghost" size="icon-sm" className="lg:hidden" onClick={onClose}>
-              <X className="size-4" />
-            </Button>
-          )}
         </div>
-      </div>
 
-      {/* список */}
-      <ScrollArea className="min-h-0 flex-1 px-3 py-3">
         {items.length === 0 ? (
           <div className="flex h-full min-h-[220px] flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border-strong/70 p-5 text-center">
             <div className="rounded-2xl bg-accent/12 p-3.5">
@@ -229,8 +233,8 @@ function CargoRow({
         aria-hidden
       />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-[13px] font-medium text-fg">{item.name}</div>
-        <div className="tnum truncate text-[11px] text-muted">
+        <div className="break-words text-[13px] font-medium leading-snug text-fg">{item.name}</div>
+        <div className="tnum break-words text-[11px] leading-snug text-muted">
           {dimsText} · {weightText}
         </div>
       </div>

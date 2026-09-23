@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { toast } from "sonner";
 
-import { parseHash } from "@/lib/advanced/share";
+import { isShareHash, parseHash } from "@/lib/advanced/share";
 import { translate } from "@/lib/i18n";
 import { useLayoutStore } from "@/store/use-layout-store";
 import { usePresetsStore } from "@/store/use-presets-store";
@@ -28,15 +28,19 @@ export function StoreHydrator() {
       useUiStore.persist.rehydrate(),
       usePresetsStore.persist.rehydrate(),
       useSessionsStore.persist.rehydrate(),
-    ]).then(() => {
+    ]).then(async () => {
       // восстановление раскладки из share-ссылки (#s=…) поверх локального стора
-      const shared = parseHash(window.location.hash);
-      if (shared) {
-        useLayoutStore.getState().replaceSession(shared);
-        history.replaceState(null, "", window.location.pathname + window.location.search);
-        toast.success(
-          translate(useUiStore.getState().locale, "toast.shareRestored")
-        );
+      const hash = window.location.hash;
+      if (isShareHash(hash)) {
+        const shared = await parseHash(hash);
+        if (shared) {
+          useLayoutStore.getState().replaceSession(shared);
+          history.replaceState(null, "", window.location.pathname + window.location.search);
+          toast.success(translate(useUiStore.getState().locale, "toast.shareRestored"));
+        } else {
+          // ссылка есть, но данные повреждены — состояние локального стора не трогаем
+          toast.error(translate(useUiStore.getState().locale, "toast.shareCorrupt"));
+        }
       }
       // на узких экранах панели-шторки закрыты по умолчанию
       if (window.matchMedia("(max-width: 1023px)").matches) {
