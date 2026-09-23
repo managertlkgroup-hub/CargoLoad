@@ -27,7 +27,7 @@ import { toast } from "sonner";
 import { useT } from "@/hooks/use-t";
 import { useVehicle } from "@/hooks/use-vehicle";
 import { GRID_SIZES } from "@/lib/constants";
-import { dimsFor } from "@/lib/geometry";
+import { dimsFor, topViewShape } from "@/lib/geometry";
 import { formatLength } from "@/lib/units";
 import { boxesFor, placementBox, validateMove, type Box3 } from "@/lib/packing/collide";
 import { snapPosition } from "@/lib/view/snap";
@@ -379,6 +379,7 @@ export default function View2D() {
                       h: d.dy * scale,
                     }}
                     selected={selectedIds.includes(p.itemId)}
+                    shape={topViewShape(item, p.axis)}
                     onSelect={(additive) => select(p.itemId, additive)}
                     onRotate={() => {
                       const res = rotatePlacement(p.id);
@@ -581,6 +582,7 @@ function CargoUnit({
   item,
   rect,
   selected,
+  shape,
   onSelect,
   onRotate,
   onContextMenuOpen,
@@ -589,6 +591,7 @@ function CargoUnit({
   item: CargoItem;
   rect: { x: number; y: number; w: number; h: number };
   selected: boolean;
+  shape: "circle" | "rect";
   onSelect: (additive: boolean) => void;
   onRotate: () => void;
   onContextMenuOpen: () => void;
@@ -628,24 +631,43 @@ function CargoUnit({
       onContextMenu={onContextMenuOpen}
     >
       <title>{`${item.name} — ${placement.x}, ${placement.y}`}</title>
-      <rect
-        x={rect.x}
-        y={rect.y}
-        width={Math.max(1, rect.w)}
-        height={Math.max(1, rect.h)}
-        rx={rx}
-        fill={item.color}
-        fillOpacity={selected ? 0.95 : 0.76}
-        stroke={selected ? "#ffffff" : "rgba(0,0,0,0.4)"}
-        strokeWidth={selected ? 2.5 : 1.5}
-        style={
-          selected
-            ? { filter: "drop-shadow(0 0 10px var(--glow-1))" }
-            : isDragging
-              ? { filter: "drop-shadow(0 8px 18px rgba(0,0,0,0.5))" }
-              : undefined
-        }
-      />
+      {shape === "circle" ? (
+        <circle
+          cx={rect.x + rect.w / 2}
+          cy={rect.y + rect.h / 2}
+          r={Math.max(1, Math.min(rect.w, rect.h) / 2)}
+          fill={item.color}
+          fillOpacity={selected ? 0.95 : 0.76}
+          stroke={selected ? "#ffffff" : "rgba(0,0,0,0.4)"}
+          strokeWidth={selected ? 2.5 : 1.5}
+          style={
+            selected
+              ? { filter: "drop-shadow(0 0 10px var(--glow-1))" }
+              : isDragging
+                ? { filter: "drop-shadow(0 8px 18px rgba(0,0,0,0.5))" }
+                : undefined
+          }
+        />
+      ) : (
+        <rect
+          x={rect.x}
+          y={rect.y}
+          width={Math.max(1, rect.w)}
+          height={Math.max(1, rect.h)}
+          rx={rx}
+          fill={item.color}
+          fillOpacity={selected ? 0.95 : 0.76}
+          stroke={selected ? "#ffffff" : "rgba(0,0,0,0.4)"}
+          strokeWidth={selected ? 2.5 : 1.5}
+          style={
+            selected
+              ? { filter: "drop-shadow(0 0 10px var(--glow-1))" }
+              : isDragging
+                ? { filter: "drop-shadow(0 8px 18px rgba(0,0,0,0.5))" }
+                : undefined
+          }
+        />
+      )}
       {showLabel && (
         <text
           x={rect.x + rect.w / 2}

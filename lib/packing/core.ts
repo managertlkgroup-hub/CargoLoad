@@ -1,5 +1,5 @@
 import { COLLISION_EPS } from "@/lib/constants";
-import { dimsFor, orientationsFor, type Geom } from "@/lib/geometry";
+import { dimsFor, type Geom } from "@/lib/geometry";
 import type {
   CargoItem,
   CylinderAxis,
@@ -15,7 +15,7 @@ import type {
 /**
  * Ядро упаковки: extreme-point алгоритм с shelf-зазорами,
  * проверкой опоры/нагрузок/совместимости при штабелировании,
- * LIFO-приоритетом мульти-стопа и учётом стороны загрузки.
+ * LIFO-приоритетом мульти-стопа и гнездованием горизонтальных цилиндров.
  *
  * Инварианты:
  *  - пересечение грузов запрещено, касание разрешено (допуск eps);
@@ -23,7 +23,8 @@ import type {
  *  - зазоры между рядами (rowLength по X, rowWidth по Y) — per-mode;
  *  - груз в пределах [wall, L−wall] × [wall, W−wall] по XY и [0, H] по Z;
  *  - стек: только в группе совместимости, через плоскую опору, с учётом
- *    макс. нагрузки сверху по всей цепочке опор.
+ *    макс. нагрузки сверху по всей цепочке опор;
+ *  - сторона загрузки (loadingSide) на раскладку НЕ влияет (только метки).
  *
  * Производительность: пространственная хеш-сетка для коллизий,
  * доминирование точек (Pareto-фронтир), каппа единиц MAX_UNITS.
@@ -32,6 +33,11 @@ import type {
 const MAX_UNITS = 6000;
 const EPS = COLLISION_EPS;
 const SUPPORT_EPS = 1.5;
+/** допуск к высоте кузова для гнездования (меньше физического кузова) */
+const NEST_TOL = 100;
+const SQRT3_2 = 0.8660254037844386;
+
+type Orient = { yaw: Yaw; axis: CylinderAxis };
 
 interface Unit {
   item: CargoItem;
@@ -204,11 +210,260 @@ function addPoint(pts: Pt[], p: Pt, rejected?: Pt[]): void {
   pts.push(p);
 }
 
+/* ----------------------------- гнездование цилиндров ----------------------------- */
+
+interface NestPlan {
+  n: number;
+  s: number;
+  k: number;
+  /** высота кургана при k слоёв (мм) */
+  height: number;
+  /** footprint кургана (мм) */
+  dx: number;
+  dy: number;
+  capacity: number;
+  /** относительные координаты слотов (от нижнего левого угла кургана), по слоям снизу вверх */
+  slots: Array<{ ux: number; uy: number; z: number }>;
+}
+
+/**
+ * План шестиугольного гнездования горизонтальных цилиндров.
+ * d — диаметр, l — длина обечайки.
+ * Ряды чередуются n (чёрный) и n−1 (смещённый на d/2) элементов —
+ * вложенных в пазы. s штабелей стоят вдоль оси длины.
+ */
+function nestPlan(
+  geom: Geom,
+  qty: number,
+  L: number,
+  W: number,
+  H: number,
+  wall: number,
+  yaw: Yaw
+): NestPlan | null {
+  const d = geom.diameter;
+  const l = geom.length;
+  if (d <= 0 || l <= 0 || qty <= 0) return null;
+
+  // поперек рядов (row): ширина кузова минус стены; вдоль штабелей (stack): длина
+  const rowMax = yaw === 0 ? W - 2 * wall : L - 2 * wall;
+  const stackMax = yaw === 0 ? L - 2 * wall : W - 2 * wall;
+  if (rowMax < d + EPS || stackMax < l + EPS) return null;
+
+  const n = Math.max(1, Math.floor(rowMax / d));
+  const smax = Math.max(1, Math.floor(stackMax / l));
+  const capacityFor = (k: number): number => {
+    if (n === 1) return k;
+    if (k % 2 === 0) return (k / 2) * (2 * n - 1);
+    return ((k + 1) / 2) * n + ((k - 1) / 2) * (n - 1);
+  };
+  const heightFor = (k: number): number => d + (k - 1) * d * SQRT3_2;
+
+  for (let s = 1; s <= smax; s++) {
+    const need = Math.ceil(qty / s);
+    for (let k = 1; k <= 50; k++) {
+      if (heightFor(k) > H + NEST_TOL) break;
+      if (capacityFor(k) < need) continue;
+      // слоты: уровень ℓ (0..k−1), позиция j в ряду, штабель σ (0..s−1)
+      const slots: Array<{ ux: number; uy: number; z: number }> = [];
+      for (let sigma = 0; sigma < s; sigma++) {
+        for (let lev = 0; lev < k; lev++) {
+          const cnt = lev % 2 === 0 ? n : n - 1;
+          const cy = lev % 2 === 1 ? d / 2 : 0;
+          for (let j = 0; j < cnt; j++) {
+            if (yaw === 90) {
+              slots.push({
+                ux: cy + j * d,
+                uy: sigma * l,
+                z: lev * d * SQRT3_2,
+              });
+            } else {
+              slots.push({
+                ux: sigma * l,
+                uy: cy + j * d,
+                z: lev * d * SQRT3_2,
+              });
+            }
+          }
+        }
+      }
+      if (slots.length < qty) continue;
+      return {
+        n,
+        s,
+        k,
+        height: heightFor(k),
+        dx: yaw === 90 ? n * d : s * l,
+        dy: yaw === 90 ? s * l : n * d,
+        capacity: s * capacityFor(k),
+        slots,
+      };
+    }
+  }
+  return null;
+}
+
+/** Типовая ориентация единицы в заданном режиме (с учётом внешней принудительной). */
+function modeOrientations(
+  item: CargoItem,
+  mode: PackRequest["mode"],
+  L: number,
+  W: number,
+  wall: number,
+  forced?: Map<string, Orient>
+): Array<Orient> {
+  const f = forced?.get(item.id);
+  if (f) return [f];
+
+  if (item.shape === "cylinder") {
+    if (item.cylinderAxis === "side") {
+      return [{ yaw: mode === "cross" ? 90 : 0, axis: "side" }];
+    }
+    // цилиндр пользователь задал стоящим: сначала up, при невместимости — лёжа
+    return mode === "cross"
+      ? [
+          { yaw: 0, axis: "up" },
+          { yaw: 90, axis: "side" },
+        ]
+      : [
+          { yaw: 0, axis: "up" },
+          { yaw: 0, axis: "side" },
+        ];
+  }
+
+  if (mode === "cross") {
+    const rot = dimsFor(item, 90, "up");
+    const fitsRot =
+      rot.dx <= L - 2 * wall + EPS && rot.dy <= W - 2 * wall + EPS;
+    return [{ yaw: fitsRot ? 90 : 0, axis: "up" }];
+  }
+  return [{ yaw: 0, axis: "up" }];
+}
+
+/* ----------------------------- поиск для «смешанного» ----------------------------- */
+
+function fitsBody(
+  item: CargoItem,
+  o: Orient,
+  L: number,
+  W: number,
+  H: number,
+  wall: number
+): boolean {
+  const d = dimsFor(item, o.yaw, o.axis);
+  return (
+    d.dx <= L - 2 * wall + EPS &&
+    d.dy <= W - 2 * wall + EPS &&
+    d.dz <= H + EPS
+  );
+}
+
+/**
+ * «Смешанный» режим: независимый выбор ориентации по типу груза,
+ * минимизирующий объём итоговой укладки. Перебор комбинаций с каппой,
+ * при превышении — жадный спуск с одиночными инверсиями.
+ */
+function mixedSearch(req: PackRequest): Map<string, Orient> | undefined {
+  const L = req.vehicle.innerLength;
+  const W = req.vehicle.innerWidth;
+  const H = req.vehicle.innerHeight;
+  const wall = clampGap(req.gaps.wall);
+  const domains = new Map<string, Orient[]>();
+  for (const item of req.items) {
+    const base: Orient[] =
+      item.shape === "cylinder"
+        ? item.cylinderAxis === "side"
+          ? [
+              { yaw: 0, axis: "side" },
+              { yaw: 90, axis: "side" },
+            ]
+          : [
+              { yaw: 0, axis: "up" },
+              { yaw: 0, axis: "side" },
+              { yaw: 90, axis: "side" },
+            ]
+        : [
+            { yaw: 0, axis: "up" },
+            { yaw: 90, axis: "up" },
+          ];
+    const dom = base.filter((o) => fitsBody(item, o, L, W, H, wall));
+    domains.set(item.id, dom.length ? dom : [base[0]]);
+  }
+
+    const ids = req.items.map((i) => i.id);
+    const combos: Array<Map<string, Orient>> = [];
+    const build = (idx: number, cur: Map<string, Orient>) => {
+      if (idx === ids.length) {
+        combos.push(new Map(cur));
+        return;
+      }
+      for (const o of domains.get(ids[idx])!) {
+        cur.set(ids[idx], o);
+        build(idx + 1, cur);
+      }
+      cur.delete(ids[idx]);
+    };
+    build(0, new Map());
+    if (!combos.length) return undefined;
+
+    const scoreOf = (assign: Map<string, Orient>): number => {
+      const r = packLayoutImpl(req, assign);
+      let xu = 0;
+      let yu = 0;
+      let zu = 0;
+      for (const p of r.placements) {
+        const item = req.items.find((i) => i.id === p.itemId);
+        if (!item) continue;
+        const d = dimsFor(item, p.yaw, p.axis);
+        xu = Math.max(xu, p.x + d.dx);
+        yu = Math.max(yu, p.y + d.dy);
+        zu = Math.max(zu, p.z + d.dz);
+      }
+      const total = req.items.reduce((s, i) => s + i.quantity, 0);
+      return (total - r.placements.length) * 1e18 + xu * yu * zu;
+    };
+
+    let best: Map<string, Orient> = combos[0];
+    let bestScore = scoreOf(best);
+
+    if (combos.length <= 2600) {
+      for (const assign of combos) {
+        const sc = scoreOf(assign);
+        if (sc < bestScore) {
+          bestScore = sc;
+          best = assign;
+        }
+      }
+      return best;
+    }
+
+    // жадный спуск
+    let improved = true;
+    while (improved) {
+      improved = false;
+      for (const id of ids) {
+        const cur = best.get(id)!;
+        for (const alt of domains.get(id)!) {
+          if (alt.yaw === cur.yaw && alt.axis === cur.axis) continue;
+          const candidate = new Map(best);
+          candidate.set(id, alt);
+          const sc = scoreOf(candidate);
+          if (sc < bestScore) {
+            bestScore = sc;
+            best = candidate;
+            improved = true;
+          }
+        }
+      }
+    }
+    return best;
+}
+
 /* ----------------------------- основной алгоритм ----------------------------- */
 
-export function packLayout(req: PackRequest): PackResult {
+function packLayoutImpl(req: PackRequest, forced?: Map<string, Orient>): PackResult {
   const t0 = now();
-  const { items, vehicle, mode, gaps, stacking, maxLayers, lifo, loadingSide } = req;
+  const { items, vehicle, mode, gaps, stacking, maxLayers, lifo } = req;
 
   const L = vehicle.innerLength;
   const W = vehicle.innerWidth;
@@ -226,14 +481,10 @@ export function packLayout(req: PackRequest): PackResult {
     else unplacedAgg.set(key, { qty, reason });
   };
 
-  /* — сторона загрузки: flipY для левого борта, основная ось заполнения — */
-  const flipY = loadingSide === "left";
-  const primaryIsY = loadingSide === "right" || loadingSide === "left";
-
   /* — предварительные данные по каждому типу груза — */
   interface ItemInfo {
     geom: Geom;
-    orients: Array<{ yaw: Yaw; axis: CylinderAxis; dx: number; dy: number; dz: number }>;
+    orients: Array<Orient & { dx: number; dy: number; dz: number }>;
     tooBig: boolean;
     volume: number;
     area: number;
@@ -241,7 +492,7 @@ export function packLayout(req: PackRequest): PackResult {
   const infoByItem = new Map<string, ItemInfo>();
 
   for (const item of items) {
-    const orients = orientationsFor(item, mode).map((o) => {
+    const orients = modeOrientations(item, mode, L, W, wall, forced).map((o) => {
       const d = dimsFor(item, o.yaw, o.axis);
       return { ...o, ...d };
     });
@@ -261,7 +512,6 @@ export function packLayout(req: PackRequest): PackResult {
     });
   }
 
-  /* — якорь заполнения (в «пространственных» координатах после flipY) — */
   const anchorX = wall;
   const anchorY = wall;
 
@@ -301,14 +551,37 @@ export function packLayout(req: PackRequest): PackResult {
     if (!deadPoint(q)) addPoint(pts, q, rejected);
   };
 
-  /* — сохранённые (ручные) размещения: keep — позиции, которые нельзя трогать
-     (перетаскивание, восстановление сессии/перезагрузки). Невалидные
-     отбрасываются и упаковываются как обычные единицы. — */
+  /**
+   * Линия фронта «полки»: максимум передней кромки среди грузов, замыкающих
+   * диапазон бокса по той же высоте (касание рядов разрешено). Новые ряды
+   * начинаются от полного фронта предыдущего, а не от кромки последнего
+   * предмета — так наборы A/B/C совпадают с эталонным ручным расчётом.
+   */
+  const frontMax = (x: number, dx: number, y: number, dy: number, z: number): number => {
+    let fx = x + dx;
+    candidates.length = 0;
+    grid.query(x, y, dx, dy, candidates);
+    for (const i of candidates) {
+      const b = placed[i];
+      if (Math.abs(b.z - z) > 0.5) continue;
+      if (
+        b.y < y + dy - 0.5 &&
+        b.y + b.dy > y - 0.5 &&
+        b.x < x + dx - 0.5 &&
+        b.x + b.dx > x + 0.5
+      ) {
+        if (b.x + b.dx > fx) fx = b.x + b.dx;
+      }
+    }
+    return fx;
+  };
+
+  /* — сохранённые (ручные) размещения: keep — позиции, которые нельзя трогать — */
   const keepKeys = new Set<string>();
   const keptPlacements: Placement[] = [];
   const keptZs: number[] = [];
-  /** отброшенные доминированием точки от keep — запасной набор кандидатов */
   const keepFallback: Pt[] = [];
+  const keptItemIds = new Set<string>();
   if (req.keep?.length) {
     const sortedKeep = [...req.keep].sort(
       (a, b) =>
@@ -324,23 +597,19 @@ export function packLayout(req: PackRequest): PackResult {
       const key = `${k.itemId}:${k.unitIndex}`;
       if (keepKeys.has(key)) continue;
       const d = dimsFor(item, k.yaw, k.axis);
-      const sx = k.x;
-      const sy = flipY ? W - k.y - d.dy : k.y;
-      // границы — как при ручном перемещении: весь кузов, без зазоров стен
       if (
-        sx < -EPS ||
-        sy < -EPS ||
-        sx + d.dx > L + EPS ||
-        sy + d.dy > W + EPS ||
+        k.x < -EPS ||
+        k.y < -EPS ||
+        k.x + d.dx > L + EPS ||
+        k.y + d.dy > W + EPS ||
         k.z < -EPS ||
         k.z + d.dz > H + EPS
       ) {
         continue;
       }
-      // пересечение с уже принятыми (касание разрешено)
       let clash = false;
       for (const b of placed) {
-        if (realOverlap(sx, sy, k.z, d.dx, d.dy, d.dz, b)) {
+        if (realOverlap(k.x, k.y, k.z, d.dx, d.dy, d.dz, b)) {
           clash = true;
           break;
         }
@@ -348,8 +617,8 @@ export function packLayout(req: PackRequest): PackResult {
       if (clash) continue;
       if (keptZs[keptZs.length - 1] !== k.z) keptZs.push(k.z);
       const box: Box = {
-        x: sx,
-        y: sy,
+        x: k.x,
+        y: k.y,
         z: k.z,
         dx: d.dx,
         dy: d.dy,
@@ -367,6 +636,7 @@ export function packLayout(req: PackRequest): PackResult {
       placed.push(box);
       grid.insert(placed.length - 1, box);
       keepKeys.add(key);
+      keptItemIds.add(k.itemId);
       keptPlacements.push({
         ...k,
         x: Math.round(k.x),
@@ -377,7 +647,6 @@ export function packLayout(req: PackRequest): PackResult {
       weightUsed += item.weight;
     }
     if (keptPlacements.length) {
-      // якорь и прежние точки могут быть заняты сохранённым грузом
       for (let i = pts.length - 1; i >= 0; i--) {
         if (deadPoint(pts[i])) pts.splice(i, 1);
       }
@@ -391,10 +660,110 @@ export function packLayout(req: PackRequest): PackResult {
     }
   }
 
-  /* — разворот единиц (сохранённые пропускаются) — */
+  /* — гнездование горизонтальных цилиндров: курган занимает блок слотом — */
+  const placements: Placement[] = [...keptPlacements];
+  const nestedItemIds = new Set<string>();
+  {
+    const candidatesNest: Array<{ item: CargoItem; plan: NestPlan; orient: Orient; volume: number }> = [];
+    for (const item of items) {
+      const info = infoByItem.get(item.id)!;
+      if (info.tooBig) continue;
+      if (keptItemIds.has(item.id)) continue;
+      const eff = modeOrientations(item, mode, L, W, wall, forced);
+      if (eff.length !== 1 || eff[0].axis !== "side") continue;
+      const plan = nestPlan(item, item.quantity, L, W, H, wall, eff[0].yaw);
+      if (!plan || plan.k < 2 || plan.capacity < item.quantity) continue;
+      candidatesNest.push({ item, plan, orient: eff[0], volume: info.volume });
+    }
+    candidatesNest.sort((a, b) => b.volume - a.volume);
+    for (const { item, plan, orient } of candidatesNest) {
+      if (weightUsed + item.weight * item.quantity > vehicle.payload + EPS) continue;
+      const floor = pts
+        .filter((p) => p.z <= EPS)
+        .sort((a, b) => a.x - b.x || a.y - b.y);
+      let settled = false;
+      for (const p of floor) {
+        if (p.x + plan.dx > L - wall + EPS || p.y + plan.dy > W - wall + EPS) continue;
+        if (plan.height > H + NEST_TOL - p.z) continue;
+        const ex = plan.dx + rowL;
+        const ey = plan.dy + rowW;
+        candidates.length = 0;
+        grid.query(p.x, p.y, ex, ey, candidates);
+        let collided = false;
+        for (const i of candidates) {
+          const b = placed[i];
+          if (effOverlap(p.x, p.y, p.z, ex, ey, plan.height, b)) {
+            collided = true;
+            break;
+          }
+        }
+        if (collided) continue;
+
+        for (let u = 0; u < item.quantity; u++) {
+          const s = plan.slots[u];
+          placements.push({
+            id: `${item.id}:${u}`,
+            itemId: item.id,
+            unitIndex: u,
+            x: Math.round(p.x + s.ux),
+            y: Math.round(p.y + s.uy),
+            z: Math.round(p.z + s.z),
+            yaw: orient.yaw,
+            axis: "side",
+            stopIndex: item.stopIndex,
+          });
+        }
+        const block: Box = {
+          x: p.x,
+          y: p.y,
+          z: p.z,
+          dx: plan.dx,
+          dy: plan.dy,
+          dz: plan.height,
+          ex,
+          ey,
+          itemId: item.id,
+          unitIndex: -1,
+          flatTop: false,
+          layer: 0,
+          loadAbove: 0,
+          supportShares: [],
+          supporters: [],
+        };
+        placed.push(block);
+        grid.insert(placed.length - 1, block);
+        weightUsed += item.weight * item.quantity;
+        nestedItemIds.add(item.id);
+
+        const usedIdx = pts.indexOf(p);
+        if (usedIdx >= 0) pts.splice(usedIdx, 1);
+        for (let k = pts.length - 1; k >= 0; k--) {
+          const q = pts[k];
+          if (
+            q.z > p.z - 0.5 &&
+            q.z < p.z + plan.height - 0.5 &&
+            q.x > p.x - 0.5 &&
+            q.x < p.x + ex - 0.5 &&
+            q.y > p.y - 0.5 &&
+            q.y < p.y + ey - 0.5
+          ) {
+            pts.splice(k, 1);
+          }
+        }
+        offerPoint(frontMax(p.x, plan.dx, p.y, plan.dy, p.z) + rowL, p.y, p.z);
+        offerPoint(p.x, p.y + plan.dy + rowW, p.z);
+        settled = true;
+        break;
+      }
+      if (settled) continue;
+    }
+  }
+
+  /* — разворот единиц (сохранённые и гнездовые пропускаются) — */
   const units: Unit[] = [];
   let totalUnits = 0;
   outer: for (const item of items) {
+    if (nestedItemIds.has(item.id)) continue;
     for (let u = 0; u < item.quantity; u++) {
       if (keepKeys.has(`${item.id}:${u}`)) continue;
       if (totalUnits >= MAX_UNITS) {
@@ -425,22 +794,17 @@ export function packLayout(req: PackRequest): PackResult {
     if (info.tooBig) addUnplaced(u.item.id, 1, "too-big");
   }
 
-  const placements: Placement[] = [...keptPlacements];
-
   for (const unit of units) {
     const item = unit.item;
     const info = infoByItem.get(item.id)!;
     if (info.tooBig) continue; // уже помечено
 
-    // предел грузоподъёмности
     if (weightUsed + item.weight > vehicle.payload + EPS) {
       addUnplaced(item.id, 1, "weight-limit");
       continue;
     }
 
-    // сортировка точек: z, затем вдоль основной оси заполнения
-    // (задняя/верхняя дверь — ряды вдоль X: сначала меньший Y;
-    //  боковые двери — столбцы вдоль Y: сначала меньший X)
+    // сортировка точек: z, затем x, затем y (полки поперёк ширины)
     const validPts = (keepFallback.length ? [...pts, ...keepFallback] : pts).filter(
       (p) =>
         p.x < L - wall - EPS &&
@@ -449,12 +813,8 @@ export function packLayout(req: PackRequest): PackResult {
     );
     validPts.sort((a, b) => {
       if (a.z !== b.z) return a.z - b.z;
-      if (primaryIsY) {
-        if (a.x !== b.x) return a.x - b.x;
-        return a.y - b.y;
-      }
-      if (a.y !== b.y) return a.y - b.y;
-      return a.x - b.x;
+      if (a.x !== b.x) return a.x - b.x;
+      return a.y - b.y;
     });
 
     let done = false;
@@ -464,7 +824,6 @@ export function packLayout(req: PackRequest): PackResult {
       for (const orient of info.orients) {
         const { dx, dy, dz, yaw, axis } = orient;
 
-        // границы кузова (реальный бокс, стены только боковые)
         if (
           p.x < wall - EPS ||
           p.y < wall - EPS ||
@@ -478,7 +837,6 @@ export function packLayout(req: PackRequest): PackResult {
         const ex = dx + rowL;
         const ey = dy + rowW;
 
-        // коллизии (эффективные боксы с зазорами рядов)
         candidates.length = 0;
         grid.query(p.x, p.y, ex, ey, candidates);
         let collided = false;
@@ -491,13 +849,11 @@ export function packLayout(req: PackRequest): PackResult {
         }
         if (collided) continue;
 
-        // опора и штабелирование
         let layer = 0;
         let supportShares: Array<[number, number]> = [];
         let supporters: number[] = [];
 
         if (p.z > 0) {
-          // собираем опоры: пересечение по XY с вершиной на высоте p.z
           candidates.length = 0;
           grid.query(p.x, p.y, dx, dy, candidates);
           const counts = new Map<number, number>();
@@ -527,11 +883,10 @@ export function packLayout(req: PackRequest): PackResult {
               }
             }
           }
-          if (supportedTotal === 0 || supportedTotal < 3) continue; // < 50% опоры
+          if (supportedTotal === 0 || supportedTotal < 3) continue;
           supporters = [...counts.keys()];
           supportShares = supporters.map((i) => [i, (counts.get(i) ?? 0) / supportedTotal]);
 
-          // совместимость опор: плоская верх, та же группа, стекинг разрешён
           let compatible = true;
           for (const i of supporters) {
             const b = placed[i];
@@ -546,8 +901,6 @@ export function packLayout(req: PackRequest): PackResult {
           layer = Math.max(...supporters.map((i) => placed[i].layer)) + 1;
           if (maxLayers > 0 && layer >= maxLayers) continue;
 
-          // полная цепочка опор вниз (без двойного обхода): множество узлов,
-          // затем распределение нагрузки вниз по убыванию z
           const closureSet = new Set<number>(supporters);
           const walk: number[] = supporters.slice();
           while (walk.length) {
@@ -568,7 +921,6 @@ export function packLayout(req: PackRequest): PackResult {
               deltas.set(pi, (deltas.get(pi) ?? 0) + d * frac);
             }
           }
-          // проверка макс. нагрузки по всей цепочке (доля веса единицы)
           let loadOk = true;
           for (const i of closureSet) {
             const b = placed[i];
@@ -580,14 +932,12 @@ export function packLayout(req: PackRequest): PackResult {
             }
           }
           if (!loadOk) continue;
-          // закрепляем нагрузку
           for (const i of closureSet) {
             placed[i].loadAbove += item.weight * (deltas.get(i) ?? 0);
           }
         }
 
         /* — размещение — */
-        const realY = flipY ? W - p.y - dy : p.y;
         const box: Box = {
           x: p.x,
           y: p.y,
@@ -614,14 +964,13 @@ export function packLayout(req: PackRequest): PackResult {
           itemId: item.id,
           unitIndex: unit.unitIndex,
           x: Math.round(p.x),
-          y: Math.round(realY),
+          y: Math.round(p.y),
           z: Math.round(p.z),
           yaw,
           axis,
           stopIndex: item.stopIndex,
         });
 
-        // новые точки (только живые)
         const usedIdx = pts.indexOf(p);
         if (usedIdx >= 0) pts.splice(usedIdx, 1);
         for (let k = pts.length - 1; k >= 0; k--) {
@@ -638,10 +987,10 @@ export function packLayout(req: PackRequest): PackResult {
           }
         }
 
-        offerPoint(p.x + dx + rowL, p.y, p.z);
+        offerPoint(frontMax(p.x, dx, p.y, dy, p.z) + rowL, p.y, p.z);
         offerPoint(p.x, p.y + dy + rowW, p.z);
         offerPoint(p.x, p.y, p.z + dz);
-        offerPoint(p.x + dx + rowL, anchorY, p.z);
+        offerPoint(frontMax(p.x, dx, p.y, dy, p.z) + rowL, anchorY, p.z);
         offerPoint(anchorX, p.y + dy + rowW, p.z);
 
         done = true;
@@ -673,4 +1022,9 @@ export function packLayout(req: PackRequest): PackResult {
     layers,
     durationMs: Math.round((now() - t0) * 1000) / 1000,
   };
+}
+
+export function packLayout(req: PackRequest): PackResult {
+  const forced = req.mode === "mixed" ? mixedSearch(req) : undefined;
+  return packLayoutImpl(req, forced);
 }

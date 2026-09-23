@@ -47,6 +47,17 @@ export function dimsBase(geom: Geom): Dims {
   return dimsFor(geom, 0, geom.shape === "cylinder" ? "up" : "up");
 }
 
+/**
+ * Форма груза в виде сверху: вертикальный цилиндр (стоит на торце) — круг,
+ * всё остальное (коробки, лёжащие цилиндры) — прямоугольник.
+ */
+export function topViewShape(
+  geom: Geom,
+  axis: CylinderAxis
+): "circle" | "rect" {
+  return geom.shape === "cylinder" && axis === "up" ? "circle" : "rect";
+}
+
 /** Объём одной единицы, мм³. */
 export function unitVolume(geom: Geom): number {
   const { dx, dy, dz } = dimsBase(geom);

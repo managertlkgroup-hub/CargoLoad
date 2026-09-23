@@ -185,15 +185,20 @@ describe("packing core", () => {
   });
 
   it("мульти-стоп LIFO: первая точка выгрузки ближе всего к двери", () => {
+    // несколько рядов, чтобы у каждой точки были свои полосы по X
     ITEMS = [
-      makeItem({ id: "stop0", quantity: 1, stopIndex: 0 }),
-      makeItem({ id: "stop1", quantity: 1, stopIndex: 1 }),
+      makeItem({ id: "stop0", quantity: 12, stopIndex: 0, width: 1000, height: 1000 }),
+      makeItem({ id: "stop1", quantity: 12, stopIndex: 1, width: 1000, height: 1000 }),
     ];
-    const r = packLayout(req({ items: ITEMS, lifo: true, vehicle: euro }));
-    const p0 = r.placements.find((p) => p.itemId === "stop0")!;
-    const p1 = r.placements.find((p) => p.itemId === "stop1")!;
-    // дверь задняя (x = L): stop0 разгружается первым → должен быть ближе к двери
-    expect(p0.x).toBeGreaterThan(p1.x);
+    const r = packLayout(
+      req({ items: ITEMS, lifo: true, vehicle: euro, stacking: false })
+    );
+    expect(r.unplaced).toHaveLength(0);
+    const xOf = (id: string) =>
+      r.placements.filter((p) => p.itemId === id).map((p) => p.x);
+    // дверь задняя (x = L): stop0 разгружается первым → ближе к двери,
+    // поэтому глубины (x) стоп не перемешаны: первая точка всегда «после» второй
+    expect(Math.min(...xOf("stop0"))).toBeGreaterThan(Math.max(...xOf("stop1")));
   });
 
   it("вертикальный цилиндр не «сплющивается»: высота = L, а не Ø", () => {

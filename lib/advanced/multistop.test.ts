@@ -38,9 +38,9 @@ function makeItem(patch: Partial<CargoItem> & { id: string }): CargoItem {
 describe("multistop: LIFO раскладка по трём точкам", () => {
   it("lifo=true: последняя точка — ближе к двери, первая — глубже", () => {
     const items = [
-      makeItem({ id: "stop0", stopIndex: 0 }),
-      makeItem({ id: "stop1", stopIndex: 1 }),
-      makeItem({ id: "stop2", stopIndex: 2 }),
+      makeItem({ id: "stop0", stopIndex: 0, quantity: 6 }),
+      makeItem({ id: "stop1", stopIndex: 1, quantity: 6 }),
+      makeItem({ id: "stop2", stopIndex: 2, quantity: 6 }),
     ];
     const r = packLayout({
       items,
@@ -53,17 +53,21 @@ describe("multistop: LIFO раскладка по трём точкам", () => 
       loadingSide: "rear",
     });
     expect(r.unplaced).toHaveLength(0);
-    const x = (id: string) => r.placements.find((p) => p.itemId === id)!.x;
-    // загрузка от передней стенки (x=0), выгрузка у задней двери (x=L)
+    const x = (id: string) => {
+      const xs = r.placements.filter((p) => p.itemId === id).map((p) => p.x);
+      return Math.min(...xs);
+    };
+    // загрузка от передней стенки (x=0), выгрузка у задней двери (x=L):
+    // полоса (ряд по Y) целиком занимает одну точку выгрузки
     expect(x("stop2")).toBeLessThan(x("stop1"));
     expect(x("stop1")).toBeLessThan(x("stop0"));
   });
 
   it("lifo=false: первая точка загружается первой (глубже)", () => {
     const items = [
-      makeItem({ id: "stop0", stopIndex: 0 }),
-      makeItem({ id: "stop1", stopIndex: 1 }),
-      makeItem({ id: "stop2", stopIndex: 2 }),
+      makeItem({ id: "stop0", stopIndex: 0, quantity: 6 }),
+      makeItem({ id: "stop1", stopIndex: 1, quantity: 6 }),
+      makeItem({ id: "stop2", stopIndex: 2, quantity: 6 }),
     ];
     const r = packLayout({
       items,
@@ -76,7 +80,10 @@ describe("multistop: LIFO раскладка по трём точкам", () => 
       loadingSide: "rear",
     });
     expect(r.unplaced).toHaveLength(0);
-    const x = (id: string) => r.placements.find((p) => p.itemId === id)!.x;
+    const x = (id: string) => {
+      const xs = r.placements.filter((p) => p.itemId === id).map((p) => p.x);
+      return Math.min(...xs);
+    };
     expect(x("stop0")).toBeLessThan(x("stop1"));
     expect(x("stop1")).toBeLessThan(x("stop2"));
   });

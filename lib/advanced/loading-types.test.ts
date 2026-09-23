@@ -60,28 +60,31 @@ describe("loading-types: профили сторон загрузки", () => {
     expect(accessDepth("top")).toBe(1);
   });
 
-  it("правый борт: заполнение колоннами по Y (одинаковый X у первых)", () => {
-    const r = packLayout({
-      items: [box("b")],
-      vehicle: kamaz,
-      mode: "along",
-      gaps: NO_GAP,
-      stacking: false,
-      maxLayers: 0,
-      lifo: false,
-      loadingSide: "right",
-    });
-    expect(r.unplaced).toHaveLength(0);
-    const ps = [...r.placements].sort((a, b) => b.z - a.z || a.x - b.x || a.y - b.y);
-    const p0 = ps[0];
-    const p1 = ps[1] ?? p0;
-    if (p0.z === 0) {
-      expect(p1.x).toBe(p0.x);
-      expect(p1.y).toBeGreaterThan(p0.y);
+  it("сторона загрузки не влияет на раскладку: rear/right/left дают одно и то же", () => {
+    const items = [box("b")];
+    const run = (loadingSide: "rear" | "right" | "left") =>
+      packLayout({
+        items,
+        vehicle: kamaz,
+        mode: "along",
+        gaps: NO_GAP,
+        stacking: false,
+        maxLayers: 0,
+        lifo: false,
+        loadingSide,
+      });
+    for (const side of ["rear", "right", "left"] as const) {
+      expect(run(side).unplaced).toHaveLength(0);
     }
+    const pickup = (r: ReturnType<typeof run>) =>
+      r.placements
+        .map((p) => [p.x, p.y, p.z, p.yaw])
+        .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+    expect(pickup(run("right"))).toEqual(pickup(run("rear")));
+    expect(pickup(run("left"))).toEqual(pickup(run("rear")));
   });
 
-  it("задняя дверь: заполнение рядами по X (одинаковый Y у первых)", () => {
+  it("заполнение: сначала столбец по Y, затем следующий ряд по X", () => {
     const r = packLayout({
       items: [box("b")],
       vehicle: kamaz,
@@ -93,12 +96,11 @@ describe("loading-types: профили сторон загрузки", () => {
       loadingSide: "rear",
     });
     expect(r.unplaced).toHaveLength(0);
-    const ps = [...r.placements].sort((a, b) => b.z - a.z || a.x - b.x || a.y - b.y);
-    const p0 = ps[0];
-    const p1 = ps[1] ?? p0;
-    if (p0.z === 0) {
-      expect(p1.y).toBe(p0.y);
-      expect(p1.x).toBeGreaterThan(p0.x);
-    }
+    const ps = [...r.placements].sort((a, b) => a.z - b.z || a.x - b.x || a.y - b.y);
+    // 3 квадрата 300×300 свободно встают друг за другом вдоль Y (2400 мм)
+    expect(ps[1].x).toBe(ps[0].x);
+    expect(ps[1].y).toBeGreaterThan(ps[0].y);
+    expect(ps[2].x).toBe(ps[0].x);
+    expect(ps[2].y).toBeGreaterThan(ps[1].y);
   });
 });
