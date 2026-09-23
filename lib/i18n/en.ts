@@ -2,6 +2,10 @@
 export const en: Record<string, string> = {
   "app.tagline": "Truckload planner",
   "app.beta": "beta",
+  "app.lang.label": "Language: English",
+
+  "units.length.label": "Length: mm / cm / m",
+  "units.weight.label": "Weight: kg / t",
 
   "mode.label": "Layout mode",
   "mode.along": "Lengthwise",

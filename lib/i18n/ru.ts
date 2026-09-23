@@ -2,6 +2,10 @@
 export const ru: Record<string, string> = {
   "app.tagline": "Планировщик загрузки кузова",
   "app.beta": "beta",
+  "app.lang.label": "Язык: Русский",
+
+  "units.length.label": "Длина: мм / см / м",
+  "units.weight.label": "Вес: кг / т",
 
   "mode.label": "Раскладка",
   "mode.along": "Вдоль",

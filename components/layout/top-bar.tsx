@@ -6,6 +6,7 @@ import {
   Columns3,
   FileSpreadsheet,
   FileText,
+  Languages,
   LayoutGrid,
   Loader2,
   PanelLeft,
@@ -25,6 +26,7 @@ import { Logo } from "@/components/logo";
 import { Segmented } from "@/components/segmented";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { VehicleSelect } from "@/components/vehicle-select";
+import { lengthUnitLabel, weightUnitLabel } from "@/lib/units";
 import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
@@ -41,7 +43,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useLayoutStore } from "@/store/use-layout-store";
 import { useUiStore } from "@/store/use-ui-store";
-import type { PackMode, ViewMode } from "@/types";
+import type { LengthUnit, PackMode, ViewMode, WeightUnit } from "@/types";
 
 export function TopBar() {
   const t = useT();
@@ -60,12 +62,17 @@ export function TopBar() {
   const setLeft = useUiStore((s) => s.setLeftPanel);
   const setRight = useUiStore((s) => s.setRightPanel);
   const openDialog = useUiStore((s) => s.openDialog);
+  const locale = useUiStore((s) => s.locale);
+  const setLocale = useUiStore((s) => s.setLocale);
+  const lengthUnit = useUiStore((s) => s.lengthUnit);
+  const weightUnit = useUiStore((s) => s.weightUnit);
+  const setUnits = useUiStore((s) => s.setUnits);
 
   const { busy, exporting, canExport, exportPdf, exportPng, exportExcel } = useExport();
 
   return (
     <header className="glass sticky top-0 z-40 m-3 mb-0 rounded-2xl px-3 py-2.5">
-      <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap">
+      <div className="flex flex-wrap items-center gap-2">
         {/* логотип + мобильные переключатели панелей */}
         <div className="flex items-center gap-2">
           <Button
@@ -146,6 +153,65 @@ export function TopBar() {
               { value: "3d", label: t("view.3d") },
             ]}
           />
+
+          <span className="mx-0.5 h-6 w-px bg-border" />
+
+          <ThemeToggle />
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 px-2"
+                aria-label={t("app.lang.label")}
+                onClick={() => setLocale(locale === "ru" ? "en" : "ru")}
+              >
+                <Languages className="size-4" />
+                <span className="tnum text-xs font-semibold uppercase">
+                  {locale === "ru" ? "RU" : "EN"}
+                </span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t("app.lang.label")}</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex">
+                <Segmented<LengthUnit>
+                  id="units-length"
+                  value={lengthUnit}
+                  onChange={(v) => setUnits({ lengthUnit: v })}
+                  ariaLabel={t("units.length.label")}
+                  options={[
+                    { value: "mm", label: lengthUnitLabel("mm", locale) },
+                    { value: "cm", label: lengthUnitLabel("cm", locale) },
+                    { value: "m", label: lengthUnitLabel("m", locale) },
+                  ]}
+                />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{t("units.length.label")}</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex">
+                <Segmented<WeightUnit>
+                  id="units-weight"
+                  value={weightUnit}
+                  onChange={(v) => setUnits({ weightUnit: v })}
+                  ariaLabel={t("units.weight.label")}
+                  options={[
+                    { value: "kg", label: weightUnitLabel("kg", locale) },
+                    { value: "t", label: weightUnitLabel("t", locale) },
+                  ]}
+                />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{t("units.weight.label")}</TooltipContent>
+          </Tooltip>
 
           <span className="mx-0.5 h-6 w-px bg-border" />
 
@@ -260,8 +326,6 @@ export function TopBar() {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-
-          <ThemeToggle />
 
           <Button
             variant="ghost"

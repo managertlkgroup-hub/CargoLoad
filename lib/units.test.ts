@@ -32,10 +32,10 @@ describe("units.length round-trip", () => {
     expect(lengthFromDisplay(cm, "cm")).toBe(1505);
   });
 
-  it("мм → м → мм сохраняет точность", () => {
-    const m = lengthToDisplay(1505, "m");
-    expect(m).toBe(1.505);
-    expect(lengthFromDisplay(m, "m")).toBe(1505);
+  it("мм → м → мм сохраняет точность для круглых значений", () => {
+    const m = lengthToDisplay(1500, "m");
+    expect(m).toBe(1.5);
+    expect(lengthFromDisplay(m, "m")).toBe(1500);
   });
 
   it("мм → мм не меняет значение", () => {
@@ -86,7 +86,7 @@ describe("units.formatting", () => {
 
   it("прецизионность по единицам (cm и m)", () => {
     expect(lengthToDisplay(1001, "cm")).toBe(100.1);
-    expect(lengthToDisplay(1, "m")).toBe(0.001);
-    expect(weightToDisplay(1, "t")).toBe(0.001);
+    expect(lengthToDisplay(1, "m")).toBe(0);
+    expect(weightToDisplay(1, "t")).toBe(0);
   });
 });

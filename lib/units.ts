@@ -11,10 +11,10 @@ export function roundTo(value: number, digits: number): number {
 }
 
 /** Точность отображения длины по единицам. */
-export const LENGTH_PRECISION: Record<LengthUnit, number> = { mm: 0, cm: 1, m: 3 };
+export const LENGTH_PRECISION: Record<LengthUnit, number> = { mm: 0, cm: 1, m: 2 };
 
 /** Точность отображения веса по единицам. */
-export const WEIGHT_PRECISION: Record<WeightUnit, number> = { kg: 2, t: 4 };
+export const WEIGHT_PRECISION: Record<WeightUnit, number> = { kg: 0, t: 2 };
 
 /** Подпись единицы длины («мм»/«см»/«м» — ru, «mm»/«cm»/«m» — en). */
 export function lengthUnitLabel(unit: LengthUnit, locale: Locale): string {
