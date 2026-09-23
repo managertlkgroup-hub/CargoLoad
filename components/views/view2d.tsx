@@ -30,8 +30,8 @@ import { GRID_SIZES } from "@/lib/constants";
 import { dimsFor, topViewShape } from "@/lib/geometry";
 import { formatLength } from "@/lib/units";
 import { boxesFor, placementBox, validateMove, type Box3 } from "@/lib/packing/collide";
-import { snapPosition } from "@/lib/view/snap";
-import { computeViewZones } from "@/lib/view/zones";
+import { snapPosition, type SnapAlign } from "@/lib/view/snap";
+import { computeViewZones, dimLabels } from "@/lib/view/zones";
 import { cn } from "@/lib/utils";
 import { useLayoutStore } from "@/store/use-layout-store";
 import { useUiStore } from "@/store/use-ui-store";
@@ -58,10 +58,13 @@ const PAD_PX = 58;
 
 /**
  * Вид сверху. Drag-and-drop через dnd-kit (activation distance 8px —
- * грузы не «прилипают» к курсору), live-проверка коллизий с откатом
- * к последней валидной позиции, snap-to-grid/стен/рёбер, слои из store
- * (не сбрасываются при переключении 2D↔3D), легенда в выделенной зоне
- * (тест непересечения с подписями размеров).
+ * грузы не «прилипают» к курсору), live-проверка коллизий: касание
+ * разрешено, запрещено только пересечение по площади; при пересечении
+ * удерживается последняя валидная позиция, снап привёл бы в коллизию —
+ * груз продолжает следовать за мышью по сырой позиции (ТЗ B1).
+ * Snap-to-grid включается только в пределах 50 мм от ребра соседа/стены,
+ * примагниченный край подсвечивается. Подписи размеров кузова привязаны
+ * к прямоугольнику кузова (ТЗ B2). Легенда — в выделенной зоне.
  */
 export default function View2D() {
   const t = useT();
@@ -142,6 +145,13 @@ export default function View2D() {
 
   const zones = computeViewZones(size.w, size.h, legendRows.length);
 
+  /* подписи размеров привязаны к кузову (ТЗ B2) */
+  const lenLabel = formatLength(L, lengthUnit, locale);
+  const widLabel = formatLength(W, lengthUnit, locale);
+  const dims = showDimensions
+    ? { ...dimLabels({ ox, oy, w: bodyW, h: bodyH }, lenLabel, widLabel), lenText: lenLabel, widText: widLabel }
+    : null;
+
   /* — сетка — */
   const gridStep = useMemo(() => {
     let g = gridSize;
@@ -161,7 +171,12 @@ export default function View2D() {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
-  const [preview, setPreview] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [preview, setPreview] = useState<{
+    id: string;
+    x: number;
+    y: number;
+    align: SnapAlign | null;
+  } | null>(null);
   const previewRef = useRef(preview);
   const dragMeta = useRef<{ startX: number; startY: number } | null>(null);
   const scaleRef = useRef(scale);
@@ -184,7 +199,7 @@ export default function View2D() {
     const p = useLayoutStore.getState().placements.find((pl) => pl.id === id);
     if (!p) return;
     dragMeta.current = { startX: p.x, startY: p.y };
-    setPreview({ id, x: p.x, y: p.y });
+    setPreview({ id, x: p.x, y: p.y, align: null });
   };
 
   const onDragMove = (e: DragMoveEvent) => {
@@ -212,16 +227,32 @@ export default function View2D() {
       enabled: snapEnabled,
     });
 
-    // live-валидация: невалидная позиция откатывается к последней валидной
-    const candidate = placementBox(item, { ...p, x: snapped.x, y: snapped.y });
     const others = geomContext(p.id);
+
+    // ТЗ B1: касание разрешено, запрещено только пересечение. Если снап привёл
+    // бы в коллизию — пробуем сырую позицию мыши; валидна — следуем за мышью
+    // (никакого «прилипания»). Иначе держим последнюю валидную позицию.
+    const candidate = placementBox(item, { ...p, x: snapped.x, y: snapped.y });
     const res = validateMove(
       candidate,
       others,
       { dx: L, dy: W, dz: vehicle.innerHeight },
       false
     );
-    if (res.ok) setPreview({ id, x: snapped.x, y: snapped.y });
+    if (res.ok) {
+      setPreview({ id, x: snapped.x, y: snapped.y, align: snapped.align });
+      return;
+    }
+
+    const rawRounded = { x: Math.round(rawX), y: Math.round(rawY) };
+    const rawCandidate = placementBox(item, { ...p, x: rawRounded.x, y: rawRounded.y });
+    const rawRes = validateMove(
+      rawCandidate,
+      others,
+      { dx: L, dy: W, dz: vehicle.innerHeight },
+      false
+    );
+    if (rawRes.ok) setPreview({ id, x: rawRounded.x, y: rawRounded.y, align: null });
   };
 
   const onDragEnd = (e: DragEndEvent) => {
@@ -380,6 +411,7 @@ export default function View2D() {
                     }}
                     selected={selectedIds.includes(p.itemId)}
                     shape={topViewShape(item, p.axis)}
+                    align={isPreview ? preview!.align : null}
                     onSelect={(additive) => select(p.itemId, additive)}
                     onRotate={() => {
                       const res = rotatePlacement(p.id);
@@ -391,19 +423,21 @@ export default function View2D() {
               })}
             </DndContext>
 
-            {/* подписи размеров кузова (зона сверху/слева — не пересекается с легендой) */}
-            {showDimensions && (
-              <g pointerEvents="none" fill="var(--muted)" fontSize={12} fontWeight={600}>
-                <text x={zones.dimsTop.x + zones.dimsTop.w / 2} y={zones.dimsTop.y + 13} textAnchor="middle">
-                  {formatLength(L, lengthUnit, locale)}
+            {/* подписи размеров кузова (ТЗ B2): привязаны к кузову, отступ 10px,
+                при нехватке места шрифт уменьшается до 11px, не отрываясь */}
+            {dims && (
+              <g pointerEvents="none" fill="var(--muted)" fontWeight={600}>
+                <text x={dims.len.x} y={dims.len.y} textAnchor="middle" fontSize={dims.len.fontSize}>
+                  {dims.lenText}
                 </text>
                 <text
-                  x={zones.dimsLeft.x + zones.dimsLeft.w / 2 - 4}
-                  y={zones.dimsLeft.y + zones.dimsLeft.h / 2}
+                  x={dims.wid.x}
+                  y={dims.wid.y}
                   textAnchor="middle"
-                  transform={`rotate(-90 ${zones.dimsLeft.x + zones.dimsLeft.w / 2 - 4} ${zones.dimsLeft.y + zones.dimsLeft.h / 2})`}
+                  fontSize={dims.wid.fontSize}
+                  transform={`rotate(-90 ${dims.wid.x} ${dims.wid.y})`}
                 >
-                  {formatLength(W, lengthUnit, locale)}
+                  {dims.widText}
                 </text>
               </g>
             )}
@@ -583,6 +617,7 @@ function CargoUnit({
   rect,
   selected,
   shape,
+  align,
   onSelect,
   onRotate,
   onContextMenuOpen,
@@ -592,6 +627,7 @@ function CargoUnit({
   rect: { x: number; y: number; w: number; h: number };
   selected: boolean;
   shape: "circle" | "rect";
+  align: SnapAlign | null;
   onSelect: (additive: boolean) => void;
   onRotate: () => void;
   onContextMenuOpen: () => void;
@@ -680,6 +716,20 @@ function CargoUnit({
         >
           {label}
         </text>
+      )}
+      {/* подсветка примагниченного края при перетаскивании (ТЗ B1) */}
+      {align && (
+        <line
+          x1={align.axis === "x" ? rect.x + (align.side === "end" ? rect.w : 0) : rect.x}
+          y1={align.axis === "y" ? rect.y + (align.side === "end" ? rect.h : 0) : rect.y}
+          x2={align.axis === "x" ? rect.x + (align.side === "end" ? rect.w : 0) : rect.x + rect.w}
+          y2={align.axis === "y" ? rect.y + (align.side === "end" ? rect.h : 0) : rect.y + rect.h}
+          stroke="var(--accent)"
+          strokeWidth={3}
+          strokeLinecap="round"
+          pointerEvents="none"
+          style={{ filter: "drop-shadow(0 0 4px var(--accent))" }}
+        />
       )}
     </g>
   );

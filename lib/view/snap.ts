@@ -18,56 +18,144 @@ export interface SnapContext {
   threshold?: number;
 }
 
-interface AxisCandidate {
-  value: number;
-  dist: number;
+export type SnapSide = "start" | "end";
+
+/** Какая сторона груза примагнитилась (к ребру соседа или к стенке). */
+export interface SnapAlign {
+  axis: "x" | "y";
+  side: SnapSide;
 }
 
-function bestAxis(
+export interface SnapResult {
+  x: number;
+  y: number;
+  /**
+   * Сторона примагниченного края для подсветки; null — снап не сработал
+   * (свободное пространство, чистая сетка либо магнит выключен).
+   */
+  align: SnapAlign | null;
+}
+
+interface AxisCand {
+  value: number;
+  align: SnapAlign | null;
+}
+
+function bestCand(
   raw: number,
-  candidates: number[],
+  cands: AxisCand[],
   threshold: number
-): number | null {
-  let best: AxisCandidate | null = null;
-  for (const c of candidates) {
-    const dist = Math.abs(c - raw);
-    if (dist <= threshold && (!best || dist < best.dist)) {
-      best = { value: c, dist };
+): AxisCand | null {
+  let best: AxisCand | null = null;
+  for (const c of cands) {
+    const dist = Math.abs(c.value - raw);
+    if (dist >= threshold) continue;
+    const bestDist = best ? Math.abs(best.value - raw) : Infinity;
+    if (
+      !best ||
+      dist < bestDist ||
+      // одинаковая дистанция: ребро/стена важнее сетки (для подсветки)
+      (dist === bestDist && c.align && !best.align)
+    ) {
+      best = c;
     }
   }
-  return best ? best.value : null;
+  return best;
+}
+
+function snapAxis(
+  raw: number,
+  size: number,
+  wallStart: number,
+  wallEnd: number,
+  gridRound: number,
+  others: Box3[],
+  axis: "x" | "y",
+  threshold: number
+): { value: number; align: SnapAlign | null } {
+  /* ТЗ B1: примагничивание включается ТОЛЬКО когда груз ближе threshold
+     (по оси) к стене кузова или к ребру соседа. В свободном пространстве
+     груз свободно следует за мышью — никакого снапа. */
+  let near = Math.min(
+    Math.abs(raw - wallStart),
+    Math.abs(raw + size - wallEnd)
+  );
+  for (const o of others) {
+    const oStart = axis === "x" ? o.x : o.y;
+    const oSize = axis === "x" ? o.dx : o.dy;
+    const oEnd = oStart + oSize;
+    near = Math.min(
+      near,
+      Math.abs(raw - oEnd), // левая(верхняя) кромка груза к правой(нижней) соседа
+      Math.abs(raw + size - oStart), // правая(нижняя) кромка груза к левой(верхней) соседа
+      Math.abs(raw - oStart), // выравнивание левых(верхних) кромок
+      Math.abs(raw + size - oEnd) // выравнивание правых(нижних) кромок
+    );
+  }
+  if (near >= threshold) {
+    // свободное пространство: груз свободно следует за мышью, без снапа
+    return { value: Math.round(raw), align: null };
+  }
+
+  const cands: AxisCand[] = [
+    { value: gridRound, align: null },
+    { value: wallStart, align: { axis, side: "start" } },
+    { value: wallEnd - size, align: { axis, side: "end" } },
+  ];
+  for (const o of others) {
+    const oStart = axis === "x" ? o.x : o.y;
+    const oSize = axis === "x" ? o.dx : o.dy;
+    const oEnd = oStart + oSize;
+    cands.push(
+      { value: oEnd, align: { axis, side: "start" } },
+      { value: oStart - size, align: { axis, side: "end" } },
+      { value: oStart, align: { axis, side: "start" } },
+      { value: oEnd - size, align: { axis, side: "end" } }
+    );
+  }
+  return bestCand(raw, cands, threshold) ?? { value: gridRound, align: null };
 }
 
 /**
- * Примагничивание: сетка + притяжение к стенкам кузова и к рёбрам соседей
- * (в пределах threshold по каждой оси независимо). Позиция всегда целая.
+ * Примагничивание: к сетке, стенкам кузова и рёбрам соседей. По ТЗ B1 снап
+ * срабатывает только когда груз приблизился к краю соседа/стене на расстояние
+ * < порога (50 мм); в свободном пространстве возвращается округлённая позиция.
+ * Если магнит выключен — только округление, без примагничивания.
  */
-export function snapPosition(rawX: number, rawY: number, ctx: SnapContext): {
-  x: number;
-  y: number;
-} {
+export function snapPosition(rawX: number, rawY: number, ctx: SnapContext): SnapResult {
   const threshold = ctx.threshold ?? SNAP_THRESHOLD;
   const grid = Math.max(1, Math.round(ctx.grid));
 
   if (!ctx.enabled) {
-    return { x: Math.round(rawX), y: Math.round(rawY) };
+    return { x: Math.round(rawX), y: Math.round(rawY), align: null };
   }
 
   const gridRound = (v: number) => Math.round(v / grid) * grid;
 
-  /* — ось X: стены [wall, L−wall−dx] + рёбра соседей — */
-  const xCands = [gridRound(rawX), ctx.wall, ctx.L - ctx.wall - ctx.dx];
-  for (const o of ctx.others) {
-    xCands.push(o.x + o.dx, o.x - ctx.dx, o.x, o.x + o.dx - ctx.dx);
-  }
-  const snappedX = bestAxis(rawX, xCands, threshold) ?? gridRound(rawX);
+  const sx = snapAxis(
+    rawX,
+    ctx.dx,
+    ctx.wall,
+    ctx.L - ctx.wall,
+    gridRound(rawX),
+    ctx.others,
+    "x",
+    threshold
+  );
+  const sy = snapAxis(
+    rawY,
+    ctx.dy,
+    ctx.wall,
+    ctx.W - ctx.wall,
+    gridRound(rawY),
+    ctx.others,
+    "y",
+    threshold
+  );
 
-  /* — ось Y — */
-  const yCands = [gridRound(rawY), ctx.wall, ctx.W - ctx.wall - ctx.dy];
-  for (const o of ctx.others) {
-    yCands.push(o.y + o.dy, o.y - ctx.dy, o.y, o.y + o.dy - ctx.dy);
-  }
-  const snappedY = bestAxis(rawY, yCands, threshold) ?? gridRound(rawY);
-
-  return { x: Math.round(snappedX), y: Math.round(snappedY) };
+  return {
+    x: Math.round(sx.value),
+    y: Math.round(sy.value),
+    align: sx.align ?? sy.align,
+  };
 }
