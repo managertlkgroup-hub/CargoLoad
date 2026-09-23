@@ -49,7 +49,9 @@ export function requiredLashingLC(input: StrappingInput): number {
 }
 
 export function strappingPlan(input: StrappingInput): StrappingPlan {
-  const needed = requiredLashingLC(input);
+  // округляем до 0.001 даН, чтобы плавающая точка не добавляла лишний строп
+  // на точных границах (15000.000000000002 не должно давать ceil=4 при LC 15000)
+  const needed = Number(requiredLashingLC(input).toFixed(3));
   const ratings = [...EN12195.strapRatings].sort((a, b) => a - b);
   let strapLC = ratings[ratings.length - 1];
   for (const r of ratings) {

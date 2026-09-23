@@ -131,4 +131,34 @@ describe("multistop: LIFO раскладка по трём точкам", () => 
     expect(stops).toHaveLength(1);
     expect(stops[0].id).toBe("stop.main");
   });
+
+  it("computeStopStats на реальной раскладке трёх точек", () => {
+    const items = [
+      makeItem({ id: "s0", stopIndex: 0, weight: 100, quantity: 6 }),
+      makeItem({ id: "s1", stopIndex: 1, weight: 100, quantity: 4 }),
+      makeItem({ id: "s2", stopIndex: 2, weight: 100, quantity: 2 }),
+    ];
+    const r = packLayout({
+      items,
+      vehicle: kamaz,
+      mode: "along",
+      gaps: NO_GAP,
+      stacking: false,
+      maxLayers: 0,
+      lifo: true,
+      loadingSide: "rear",
+    });
+    expect(r.unplaced).toHaveLength(0);
+    const stats = computeStopStats(items, r.placements);
+    expect(stats.map((s) => s.stopIndex)).toEqual([0, 1, 2]);
+    const byStop = Object.fromEntries(stats.map((s) => [s.stopIndex, s]));
+    expect(byStop[0]).toMatchObject({ units: 6, weightKg: 600 });
+    expect(byStop[1]).toMatchObject({ units: 4, weightKg: 400 });
+    expect(byStop[2]).toMatchObject({ units: 2, weightKg: 200 });
+    // объёмы согласованы с unitVolume (600×400×400 = 0.096 м³)
+    expect(byStop[0].volumeM3).toBeCloseTo(0.58, 2);
+    // нагрузка складывается в вес кузова
+    const total = stats.reduce((s, x) => s + x.weightKg, 0);
+    expect(total).toBe(1200);
+  });
 });
