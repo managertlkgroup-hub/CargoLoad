@@ -1,24 +1,16 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Boxes, Copy, Layers, Pencil, Plus, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
+import { Boxes, Copy, Layers, LayoutList, Pencil, Plus, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 
-import { useCargoPresets } from "@/hooks/use-presets";
 import { useT } from "@/hooks/use-t";
 import { formatLength, formatWeight } from "@/lib/units";
+import { isOversizeItem } from "@/lib/oversize";
 import { cn } from "@/lib/utils";
 import { useLayoutStore } from "@/store/use-layout-store";
 import { useUiStore } from "@/store/use-ui-store";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { CargoItem } from "@/types";
 
@@ -31,22 +23,12 @@ export function LeftPanel({ onClose }: { onClose?: () => void }) {
   const items = useLayoutStore((s) => s.items);
   const selectedIds = useLayoutStore((s) => s.selectedIds);
   const select = useLayoutStore((s) => s.select);
-  const addItem = useLayoutStore((s) => s.addItem);
   const duplicateItems = useLayoutStore((s) => s.duplicateItems);
   const removeItems = useLayoutStore((s) => s.removeItems);
   const clearSelection = useLayoutStore((s) => s.clearSelection);
   const openDialog = useUiStore((s) => s.openDialog);
-  const presets = useCargoPresets();
 
   const totalWeight = items.reduce((s, i) => s + i.weight * i.quantity, 0);
-
-  const quickAdd = (presetId: string) => {
-    const preset = presets.find((p) => p.id === presetId);
-    if (!preset) return;
-    const name = locale === "en" ? preset.nameEn || preset.name : preset.name;
-    addItem({ ...preset.data, name, presetId: preset.id });
-    toast(t("toast.added"));
-  };
 
   return (
     <aside className="glass flex h-full min-h-0 w-full flex-col rounded-2xl lg:w-[300px]">
@@ -88,49 +70,27 @@ export function LeftPanel({ onClose }: { onClose?: () => void }) {
 
       {/* список */}
       <ScrollArea className="min-h-0 flex-1 px-3 py-3">
-        {/* «Добавить груз» закреплён вверху списка — виден и доступен всегда */}
-        <div className="sticky top-0 z-10 -mx-3 mb-2 border-b border-border/60 bg-panel-strong/85 px-3 pb-2 pt-1.5 backdrop-blur-md">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" className="w-full" aria-label={t("cargo.add")}>
-                <Plus className="size-3.5" />
-                {t("cargo.add")}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="max-h-[60vh] w-[290px] overflow-y-auto">
-              <DropdownMenuLabel>{t("cargo.presets")}</DropdownMenuLabel>
-              {presets
-                .filter((p) => p.builtin)
-                .map((p) => (
-                  <DropdownMenuItem key={p.id} onClick={() => quickAdd(p.id)}>
-                    <span
-                      className="size-2.5 shrink-0 rounded-[4px]"
-                      style={{ background: p.data.color }}
-                    />
-                    <span className="truncate">{locale === "en" ? p.nameEn || p.name : p.name}</span>
-                  </DropdownMenuItem>
-                ))}
-              {presets.some((p) => !p.builtin) && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel>{t("cargo.custom")}</DropdownMenuLabel>
-                  {presets
-                    .filter((p) => !p.builtin)
-                    .map((p) => (
-                      <DropdownMenuItem key={p.id} onClick={() => quickAdd(p.id)}>
-                        <span
-                          className="size-2.5 shrink-0 rounded-[4px]"
-                          style={{ background: p.data.color }}
-                        />
-                        <span className="truncate">
-                          {locale === "en" ? p.nameEn || p.name : p.name}
-                        </span>
-                      </DropdownMenuItem>
-                    ))}
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+        {/* «Добавить груз» + «Из пресета» закреплены вверху списка — видны всегда */}
+        <div className="sticky top-0 z-10 -mx-3 mb-2 flex gap-2 border-b border-border/60 bg-panel-strong/85 px-3 pb-2 pt-1.5 backdrop-blur-md">
+          <Button
+            size="sm"
+            className="flex-1"
+            aria-label={t("cargo.add")}
+            onClick={() => openDialog({ kind: "cargo" })}
+          >
+            <Plus className="size-3.5" />
+            {t("cargo.add")}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1"
+            aria-label={t("cargo.addFromPreset")}
+            onClick={() => openDialog({ kind: "presets", tab: "cargo" })}
+          >
+            <LayoutList className="size-3.5" />
+            {t("cargo.addFromPreset")}
+          </Button>
         </div>
 
         {items.length === 0 ? (
@@ -233,7 +193,14 @@ function CargoRow({
         aria-hidden
       />
       <div className="min-w-0 flex-1">
-        <div className="break-words text-[13px] font-medium leading-snug text-fg">{item.name}</div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="break-words text-[13px] font-medium leading-snug text-fg">{item.name}</span>
+          {isOversizeItem(item) && (
+            <span className="rounded-md bg-danger/15 px-1.5 py-0.5 text-[10px] font-semibold text-danger">
+              {t("cargo.oversize")}
+            </span>
+          )}
+        </div>
         <div className="tnum break-words text-[11px] leading-snug text-muted">
           {dimsText} · {weightText}
         </div>

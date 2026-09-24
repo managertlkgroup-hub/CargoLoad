@@ -41,6 +41,7 @@ const FIELD_ALIASES: Record<keyof ImportRow, string[]> = {
   stackable: ["stackable", "штабелируемый", "стек", "штабелируется"],
   group: ["group", "группа", "группасовместимости", "совместимость"],
   color: ["color", "цвет"],
+  isOversize: ["isoversize", "oversize", "негабарит", "негабаритный"],
 };
 
 function normHeader(s: string): string {
@@ -90,11 +91,15 @@ function toBool(v: unknown): boolean | undefined {
   return undefined;
 }
 
-function parseShape(v: string | undefined): "box" | "cylinder" | "oversize" {
+function parseShape(v: string | undefined): "box" | "cylinder" {
   const s = (v ?? "").toLowerCase().trim();
   if (["cylinder", "цилиндр", "бочка", "barrel", "cyl"].includes(s)) return "cylinder";
-  if (["oversize", "негабарит", "негабаритный"].includes(s)) return "oversize";
   return "box";
+}
+
+/** Значение «негабарит» — юзер-флаг, а не форма груза. */
+function isOversizeValue(v: string | undefined): boolean {
+  return ["oversize", "негабарит", "негабаритный"].includes((v ?? "").toLowerCase().trim());
 }
 
 const DEFAULT_DIAMETER = 1000;
@@ -110,7 +115,15 @@ function mapRow(
     if (!field) continue;
     const value = raw === null || raw === undefined ? "" : raw;
     if (field === "shape") {
-      out.shape = parseShape(typeof value === "string" ? value : undefined);
+      const str = typeof value === "string" ? value : undefined;
+      out.shape = parseShape(str);
+      // legacy-значение «oversize» поднимает юзер-флаг негабарита
+      if (isOversizeValue(str)) out.isOversize = true;
+      continue;
+    }
+    if (field === "isOversize") {
+      const b = toBool(value);
+      if (b !== undefined) out.isOversize = b;
       continue;
     }
     if (field === "stackable") {
@@ -152,6 +165,7 @@ function finalizeRow(partial: Partial<ImportRow>): ImportRow {
     stackable,
     group: partial.group ?? "general",
     color: partial.color ?? "#8B5CF6",
+    isOversize: partial.isOversize ?? false,
   } as ImportRow;
 }
 

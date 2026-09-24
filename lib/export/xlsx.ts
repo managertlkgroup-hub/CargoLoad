@@ -149,7 +149,7 @@ export function buildWorkbook(model: ExportModel, tx: XlsxTexts): WorkBook {
   for (const item of model.items) {
     goodsAoa.push([
       item.name,
-      tx.shape[item.shape],
+      tx.shape[item.shape] ?? tx.shape.box,
       num(item.length),
       num(item.width),
       num(item.height),

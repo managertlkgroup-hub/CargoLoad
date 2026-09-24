@@ -255,7 +255,7 @@ export const BUILTIN_CARGO_PRESETS: CargoPreset[] = [
     builtin: true,
     data: {
       name: "Станок",
-      shape: "oversize",
+      shape: "box",
       length: 2500,
       width: 1500,
       height: 2000,
@@ -268,6 +268,7 @@ export const BUILTIN_CARGO_PRESETS: CargoPreset[] = [
       color: CARGO_COLORS[7],
       cylinderAxis: "up",
       stopIndex: 0,
+      isOversize: true,
     },
   },
   {

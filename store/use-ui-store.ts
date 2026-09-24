@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-import { DEFAULT_VEHICLE_ID, GRID_SIZES } from "@/lib/constants";
+import { DEFAULT_VEHICLE_ID, GRID_SIZES, SNAP_THRESHOLD, type SnapThreshold } from "@/lib/constants";
 import type { LengthUnit, Locale, ViewMode, WeightUnit } from "@/types";
 
 /** Какой диалог открыт (одновременно максимум один; не персистится). */
@@ -25,6 +25,8 @@ interface UiState {
   /** активный слой: -1 = все слои */
   activeLayer: number;
   snapEnabled: boolean;
+  /** порог примагничивания, мм; 0 — магнит выключен */
+  snapThreshold: SnapThreshold;
   gridSize: (typeof GRID_SIZES)[number];
   showLegend: boolean;
   showDimensions: boolean;
@@ -41,6 +43,7 @@ interface UiState {
   setViewMode: (mode: ViewMode) => void;
   setActiveLayer: (layer: number) => void;
   setSnapEnabled: (v: boolean) => void;
+  setSnapThreshold: (v: SnapThreshold) => void;
   setGridSize: (size: (typeof GRID_SIZES)[number]) => void;
   toggleLegend: () => void;
   toggleDimensions: () => void;
@@ -62,6 +65,7 @@ export const useUiStore = create<UiState>()(
       viewMode: "2d",
       activeLayer: -1,
       snapEnabled: true,
+      snapThreshold: SNAP_THRESHOLD,
       gridSize: GRID_SIZES[1],
       showLegend: true,
       showDimensions: true,
@@ -76,6 +80,7 @@ export const useUiStore = create<UiState>()(
       setViewMode: (viewMode) => set({ viewMode }),
       setActiveLayer: (activeLayer) => set({ activeLayer }),
       setSnapEnabled: (snapEnabled) => set({ snapEnabled }),
+      setSnapThreshold: (snapThreshold) => set({ snapThreshold }),
       setGridSize: (gridSize) => set({ gridSize }),
       toggleLegend: () => set((s) => ({ showLegend: !s.showLegend })),
       toggleDimensions: () => set((s) => ({ showDimensions: !s.showDimensions })),
@@ -97,6 +102,7 @@ export const useUiStore = create<UiState>()(
         viewMode: s.viewMode,
         activeLayer: s.activeLayer,
         snapEnabled: s.snapEnabled,
+        snapThreshold: s.snapThreshold,
         gridSize: s.gridSize,
         showLegend: s.showLegend,
         showDimensions: s.showDimensions,

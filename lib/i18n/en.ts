@@ -40,6 +40,7 @@ export const en: Record<string, string> = {
 
   "cargo.title": "Cargo",
   "cargo.add": "Add cargo",
+  "cargo.addFromPreset": "From preset",
   "cargo.quickAdd": "Quick add",
   "cargo.edit": "Edit",
   "cargo.duplicate": "Duplicate",
@@ -56,6 +57,13 @@ export const en: Record<string, string> = {
   "cargo.shape.box": "Box",
   "cargo.shape.cylinder": "Cylinder",
   "cargo.shape.oversize": "Oversize",
+  "cargo.oversize": "Oversize",
+  "cargo.isOversize": "Oversize cargo",
+  "cargo.isOversizeHint": "Check if the cargo does not fit the body and is shipped as oversize.",
+  "cargo.oversizeConfirm.title": "Cargo is larger than the body",
+  "cargo.oversizeConfirm.text": "The cargo ({dims}) is larger than the body. Mark it as oversize?",
+  "cargo.oversizeConfirm.mark": "Mark as oversize",
+  "cargo.oversizeConfirm.keep": "Keep as regular",
   "cargo.stackable": "Stackable",
   "cargo.notStackable": "Non-stackable",
   "cargo.maxTopLoad": "Max top load",
@@ -129,6 +137,7 @@ export const en: Record<string, string> = {
   "vehicle.catalog": "All vehicles",
   "vehicle.catalog.hint": "Dimensions, payload and axle layout",
   "vehicle.pickFit": "Find best vehicle",
+  "vehicle.new": "Create new",
 
   "fit.title": "Vehicle fit",
   "fit.subtitle": "Which vehicle fits all the cargo — computed for every candidate",
@@ -258,6 +267,7 @@ export const en: Record<string, string> = {
   "snap.grid": "Grid step",
   "snap.on": "On",
   "snap.off": "Off",
+  "snap.thresholdHint": "Snap threshold: engages when cargo is closer than the threshold to a wall or a neighbor edge. “Off” disables the magnet entirely.",
 
   "export.pdf": "Export PDF",
   "export.png": "PNG snapshot",

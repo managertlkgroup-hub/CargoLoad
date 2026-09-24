@@ -11,6 +11,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import {
+  Check,
   ChevronDown,
   ChevronUp,
   Copy,
@@ -26,7 +27,7 @@ import { toast } from "sonner";
 
 import { useT } from "@/hooks/use-t";
 import { useVehicle } from "@/hooks/use-vehicle";
-import { GRID_SIZES } from "@/lib/constants";
+import { GRID_SIZES, SNAP_THRESHOLDS } from "@/lib/constants";
 import { dimsFor, topViewShape } from "@/lib/geometry";
 import { formatLength } from "@/lib/units";
 import { boxesFor, placementBox, validateMove, type Box3 } from "@/lib/packing/collide";
@@ -51,6 +52,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { LayerControls } from "@/components/views/layer-controls";
 import type { CargoItem, Placement } from "@/types";
 
@@ -89,6 +97,8 @@ export default function View2D() {
   const setActiveLayer = useUiStore((s) => s.setActiveLayer);
   const snapEnabled = useUiStore((s) => s.snapEnabled);
   const setSnapEnabled = useUiStore((s) => s.setSnapEnabled);
+  const snapThreshold = useUiStore((s) => s.snapThreshold);
+  const setSnapThreshold = useUiStore((s) => s.setSnapThreshold);
   const gridSize = useUiStore((s) => s.gridSize);
   const setGridSize = useUiStore((s) => s.setGridSize);
   const showLegend = useUiStore((s) => s.showLegend);
@@ -97,6 +107,9 @@ export default function View2D() {
   const toggleDimensions = useUiStore((s) => s.toggleDimensions);
   const locale = useUiStore((s) => s.locale);
   const lengthUnit = useUiStore((s) => s.lengthUnit);
+
+  /* магнит включён, только когда выбран ненулевой порог */
+  const snapOn = snapEnabled && snapThreshold > 0;
 
   /* — размер контейнера — */
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -162,7 +175,7 @@ export default function View2D() {
 
   const vLines: number[] = [];
   const hLines: number[] = [];
-  if (snapEnabled) {
+  if (snapOn) {
     for (let x = gridStep; x < L && vLines.length < 300; x += gridStep) vLines.push(x);
     for (let y = gridStep; y < W && hLines.length < 300; y += gridStep) hLines.push(y);
   }
@@ -224,7 +237,8 @@ export default function View2D() {
       dy: d.dy,
       others: geomContext(p.id, p.z),
       grid: gridSize,
-      enabled: snapEnabled,
+      enabled: snapOn,
+      threshold: snapThreshold,
     });
 
     const others = geomContext(p.id);
@@ -322,7 +336,7 @@ export default function View2D() {
             </defs>
 
             {/* сетка */}
-            {snapEnabled && (
+            {snapOn && (
               <g clipPath="url(#bodyClip)" pointerEvents="none">
                 {vLines.map((x) => (
                   <line
@@ -495,16 +509,50 @@ export default function View2D() {
             </div>
 
             <div className="glass-strong flex items-center gap-1 rounded-xl p-1">
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                className={cn(snapEnabled && "bg-accent/15 text-accent")}
-                title={`${t("snap.title")} (${t(snapEnabled ? "snap.on" : "snap.off")})`}
-                aria-label={t("snap.title")}
-                onClick={() => setSnapEnabled(!snapEnabled)}
-              >
-                <Magnet className="size-4" />
-              </Button>
+              <DropdownMenu>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className={cn(
+                          "h-7 gap-1.5 px-2.5 text-[11.5px]",
+                          snapOn && "bg-accent/15 text-accent"
+                        )}
+                        aria-label={t("snap.title")}
+                      >
+                        <Magnet className="size-4 shrink-0" />
+                        <span className="max-w-[120px] truncate">
+                          {t("snap.title")}:{" "}
+                          {snapThreshold === 0 ? t("snap.off") : formatLength(snapThreshold, "mm", locale)}
+                        </span>
+                        <ChevronDown className="size-3 shrink-0 text-muted" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-[280px]">
+                    <p>{t("snap.thresholdHint")}</p>
+                  </TooltipContent>
+                </Tooltip>
+                <DropdownMenuContent align="end" className="w-44">
+                  {SNAP_THRESHOLDS.map((th) => (
+                    <DropdownMenuItem
+                      key={th}
+                      onClick={() => {
+                        setSnapThreshold(th);
+                        if (th === 0) setSnapEnabled(false);
+                        else setSnapEnabled(true);
+                      }}
+                    >
+                      <span className="flex-1">
+                        {th === 0 ? t("snap.off") : formatLength(th, "mm", locale)}
+                      </span>
+                      {snapThreshold === th && <Check className="size-3.5 text-accent" />}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Select
                 value={String(gridSize)}
                 onValueChange={(v) =>
@@ -514,7 +562,7 @@ export default function View2D() {
                 <SelectTrigger
                   className="h-7 w-[84px] rounded-lg px-2 text-[11.5px]"
                   aria-label={t("snap.grid")}
-                  disabled={!snapEnabled}
+                  disabled={!snapOn}
                 >
                   <SelectValue />
                 </SelectTrigger>

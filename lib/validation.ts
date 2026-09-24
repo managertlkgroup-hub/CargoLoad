@@ -21,7 +21,7 @@ export function createCargoItemSchema(s: T) {
         .trim()
         .min(1, s("validation.nameRequired"))
         .max(120, s("validation.nameMax", { n: 120 })),
-      shape: z.enum(["box", "cylinder", "oversize"]),
+      shape: z.enum(["box", "cylinder"]),
       length: ranged(s, "cargoLength", "cargoLength"),
       width: ranged(s, "cargoWidth", "cargoWidth"),
       height: ranged(s, "cargoHeight", "cargoHeight"),
@@ -44,6 +44,7 @@ export function createCargoItemSchema(s: T) {
       color: z.string().regex(/^#[0-9a-fA-F]{6}$/, s("validation.colorFormat")),
       cylinderAxis: z.enum(["up", "side"]),
       stopIndex: z.number().int().min(0).max(99),
+      isOversize: z.boolean().optional().default(false),
     })
     .superRefine((v, ctx) => {
       if (v.shape === "cylinder" && v.diameter < LIMITS.diameter.min) {
@@ -140,7 +141,7 @@ export function createSessionNameSchema(s: T) {
 export function createImportRowSchema(s: T) {
   return z.object({
     name: z.string().trim().min(1, s("validation.importName")),
-    shape: z.enum(["box", "cylinder", "oversize"]),
+    shape: z.enum(["box", "cylinder"]),
     length: ranged(s, "cargoLength", "cargoLength"),
     width: ranged(s, "cargoWidth", "cargoWidth"),
     height: ranged(s, "cargoHeight", "cargoHeight"),
@@ -150,6 +151,7 @@ export function createImportRowSchema(s: T) {
     stackable: z.boolean(),
     group: z.string().min(1),
     color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+    isOversize: z.boolean().optional().default(false),
   });
 }
 

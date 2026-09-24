@@ -84,8 +84,12 @@ export const CARGO_GROUP_LABELS: Record<CargoGroup, { ru: string; en: string }> 
 /** Шаги сетки для примагничивания, мм. */
 export const GRID_SIZES = [25, 50, 100, 200] as const;
 
-/** Порог примагничивания к стенкам/рёбрам, мм (ТЗ B1: срабатывает только < 50 мм). */
+/** Порог примагничивания к стенкам/рёбрам, мм (ТЗ B1: срабатывает только < порога). */
 export const SNAP_THRESHOLD = 50;
+
+/** Доступные пороги магнита: 0 — выключен, 25/50/100 — мм. */
+export const SNAP_THRESHOLDS = [0, 25, 50, 100] as const;
+export type SnapThreshold = (typeof SNAP_THRESHOLDS)[number];
 
 /** Допуск коллизии: касание разрешено (до -0.5 мм), пересечение запрещено. */
 export const COLLISION_EPS = 0.5;

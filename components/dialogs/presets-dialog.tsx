@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useCargoPresets, useVehicles } from "@/hooks/use-presets";
 import { useT } from "@/hooks/use-t";
 import { formatLength, formatWeight, lengthUnitLabel } from "@/lib/units";
+import { useLayoutStore } from "@/store/use-layout-store";
 import { usePresetsStore } from "@/store/use-presets-store";
 import { useUiStore } from "@/store/use-ui-store";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,9 @@ export function PresetsDialog() {
   const dialogOpen = useUiStore((s) => s.dialogOpen);
   const closeDialog = useUiStore((s) => s.closeDialog);
   const openDialog = useUiStore((s) => s.openDialog);
+  const locale = useUiStore((s) => s.locale);
+  const addItem = useLayoutStore((s) => s.addItem);
+  const cargoPresets = useCargoPresets();
 
   const open = dialogOpen && dialog?.kind === "presets";
   // стартовая вкладка приходит из dialog.tab; ручные переключатели перекрывают её
@@ -40,6 +44,15 @@ export function PresetsDialog() {
   const [tabOverride, setTabOverride] = useState<Tab | null>(null);
   const tab = tabOverride ?? initialTab;
   const [confirmId, setConfirmId] = useState<string | null>(null);
+
+  /** добавить груз из пресета в раскладку (оставляет диалог открытым). */
+  const addPresetToLayout = (id: string) => {
+    const preset = cargoPresets.find((p) => p.id === id);
+    if (!preset) return;
+    const name = locale === "en" ? preset.nameEn || preset.name : preset.name;
+    addItem({ ...preset.data, name, presetId: preset.id });
+    toast(t("toast.added"));
+  };
 
   return (
     <Dialog
@@ -74,6 +87,7 @@ export function PresetsDialog() {
               setConfirmId={setConfirmId}
               onNew={() => openDialog({ kind: "cargoPreset" })}
               onEdit={(id) => openDialog({ kind: "cargoPreset", presetId: id })}
+              onAdd={addPresetToLayout}
             />
           </TabsContent>
           <TabsContent value="vehicle">
@@ -95,6 +109,7 @@ interface SectionProps {
   setConfirmId: (id: string | null) => void;
   onNew: () => void;
   onEdit: (id: string) => void;
+  onAdd?: (id: string) => void;
 }
 
 function SectionHeader({ onNew }: { onNew: () => void }) {
@@ -120,6 +135,7 @@ function PresetActions({
   onEdit,
   onDelete,
   resetLabel,
+  onAdd,
 }: {
   id: string;
   name: string;
@@ -130,6 +146,7 @@ function PresetActions({
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
   resetLabel: (id: string) => void;
+  onAdd?: (id: string) => void;
 }) {
   const t = useT();
   const confirming = confirmId === id;
@@ -163,6 +180,18 @@ function PresetActions({
 
   return (
     <div className="flex shrink-0 gap-0.5 opacity-70 transition-opacity group-hover:row:opacity-100 focus-within:opacity-100">
+      {onAdd && (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="text-accent"
+          aria-label={t("cargo.add")}
+          title={t("cargo.add")}
+          onClick={() => onAdd(id)}
+        >
+          <Plus className="size-3.5" />
+        </Button>
+      )}
       <Button
         variant="ghost"
         size="icon-sm"
@@ -198,7 +227,7 @@ function PresetActions({
   );
 }
 
-function CargoPresets({ confirmId, setConfirmId, onNew, onEdit }: SectionProps) {
+function CargoPresets({ confirmId, setConfirmId, onNew, onEdit, onAdd }: SectionProps) {
   const t = useT();
   const locale = useUiStore((s) => s.locale);
   const lengthUnit = useUiStore((s) => s.lengthUnit);
@@ -236,6 +265,7 @@ function CargoPresets({ confirmId, setConfirmId, onNew, onEdit }: SectionProps) 
                   setConfirmId={setConfirmId}
                   onEdit={onEdit}
                   onDelete={() => undefined}
+                  onAdd={onAdd}
                   resetLabel={(id) => {
                     resetCargoPreset(id);
                     toast(t("toast.presetReset"));
@@ -273,6 +303,7 @@ function CargoPresets({ confirmId, setConfirmId, onNew, onEdit }: SectionProps) 
                     confirmId={confirmId}
                     setConfirmId={setConfirmId}
                     onEdit={onEdit}
+                    onAdd={onAdd}
                     onDelete={(id) => {
                       deleteCustomCargo(id);
                       toast(t("toast.presetDeleted"));

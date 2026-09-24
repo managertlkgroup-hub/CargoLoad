@@ -41,6 +41,7 @@ function toDraft(row: ImportRow): CargoItemDraft {
     color: row.color,
     cylinderAxis: "up",
     stopIndex: 0,
+    isOversize: !!row.isOversize,
   };
 }
 

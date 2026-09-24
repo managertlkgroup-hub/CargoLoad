@@ -40,6 +40,7 @@ export const ru: Record<string, string> = {
 
   "cargo.title": "Грузы",
   "cargo.add": "Добавить груз",
+  "cargo.addFromPreset": "Из пресета",
   "cargo.quickAdd": "Быстрое добавление",
   "cargo.edit": "Изменить",
   "cargo.duplicate": "Дублировать",
@@ -57,6 +58,13 @@ export const ru: Record<string, string> = {
   "cargo.shape.box": "Прямоугольник",
   "cargo.shape.cylinder": "Цилиндр",
   "cargo.shape.oversize": "Негабарит",
+  "cargo.oversize": "Негабарит",
+  "cargo.isOversize": "Негабаритный груз",
+  "cargo.isOversizeHint": "Отметьте, если груз не помещается в кузов и перевозится как негабаритный.",
+  "cargo.oversizeConfirm.title": "Груз больше кузова",
+  "cargo.oversizeConfirm.text": "Груз больше кузова ({dims}). Отметить как негабаритный?",
+  "cargo.oversizeConfirm.mark": "Отметить негабаритом",
+  "cargo.oversizeConfirm.keep": "Оставить обычным",
   "cargo.stackable": "Штабелируемый",
   "cargo.notStackable": "Нештабелируемый",
   "cargo.maxTopLoad": "Макс. нагрузка сверху",
@@ -130,6 +138,7 @@ export const ru: Record<string, string> = {
   "vehicle.catalog": "Все автомобили",
   "vehicle.catalog.hint": "Габариты, грузоподъёмность и схема осей",
   "vehicle.pickFit": "Подобрать автомобиль",
+  "vehicle.new": "Создать новый",
 
   "fit.title": "Подбор автомобиля",
   "fit.subtitle": "Какой автомобиль вместит весь груз — расчёт для каждого кандидата",
@@ -259,6 +268,7 @@ export const ru: Record<string, string> = {
   "snap.grid": "Шаг сетки",
   "snap.on": "Вкл",
   "snap.off": "Выкл",
+  "snap.thresholdHint": "Порог примагничивания: срабатывает, когда груз ближе порога к стенке кузова или к ребру соседа. «Выкл» отключает магнит полностью.",
 
   "export.pdf": "Экспорт PDF",
   "export.png": "Снимок PNG",

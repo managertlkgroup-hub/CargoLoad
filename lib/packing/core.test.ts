@@ -222,7 +222,9 @@ describe("packing core", () => {
   });
 
   it("негабарит больше кузова → too-big", () => {
-    ITEMS = [makeItem({ id: "huge", shape: "oversize", length: 8000, width: 3000, height: 3000 })];
+    ITEMS = [
+      makeItem({ id: "huge", shape: "box", isOversize: true, length: 8000, width: 3000, height: 3000 }),
+    ];
     const r = packLayout(req({ items: ITEMS }));
     expect(r.placements).toHaveLength(0);
     expect(r.unplaced[0]?.reason).toBe("too-big");

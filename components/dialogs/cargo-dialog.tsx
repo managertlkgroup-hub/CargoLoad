@@ -1,7 +1,7 @@
 "use client";
 
-import { Box, Cylinder, Triangle } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { Box, Cylinder, Info } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import {
   useForm,
   type FieldErrors,
@@ -11,13 +11,28 @@ import {
 import { toast } from "sonner";
 
 import { useT } from "@/hooks/use-t";
+import { useVehicle } from "@/hooks/use-vehicle";
 import { LIMITS } from "@/lib/constants";
+import { dimsBase } from "@/lib/geometry";
 import { genId } from "@/lib/id";
+import { exceedsVehicleDims } from "@/lib/oversize";
+import { formatLength, lengthUnitLabel } from "@/lib/units";
 import { createCargoItemSchema, type T } from "@/lib/validation";
 import { useLayoutStore } from "@/store/use-layout-store";
 import { usePresetsStore } from "@/store/use-presets-store";
 import { useUiStore } from "@/store/use-ui-store";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +51,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Segmented } from "@/components/segmented";
 import type { CargoShape, CylinderAxis } from "@/types";
 
@@ -66,6 +82,7 @@ interface CargoFormValues {
   color: string;
   cylinderAxis: CylinderAxis;
   stopIndex: number;
+  isOversize: boolean;
 }
 
 const DEFAULTS: CargoFormValues = {
@@ -83,6 +100,7 @@ const DEFAULTS: CargoFormValues = {
   color: "#8B5CF6",
   cylinderAxis: "up",
   stopIndex: 0,
+  isOversize: false,
 };
 
 function clamp(v: number, r: { min: number; max: number }): number {
@@ -105,6 +123,13 @@ function normalize(v: CargoFormValues): CargoFormValues {
   return out;
 }
 
+/** Legacy-раскладки могли сохранить shape "oversize" — приводим к флагу. */
+function coerceLegacy(v: CargoFormValues): CargoFormValues {
+  const shape: string = v.shape;
+  if (shape === "oversize") return { ...v, shape: "box", isOversize: true };
+  return v;
+}
+
 const resolverFor = (t: T): Resolver<CargoFormValues> =>
   (async (values: CargoFormValues) => {
     const norm = normalize(values);
@@ -125,6 +150,9 @@ export function CargoDialog() {
   const dialog = useUiStore((s) => s.dialog);
   const dialogOpen = useUiStore((s) => s.dialogOpen);
   const closeDialog = useUiStore((s) => s.closeDialog);
+  const locale = useUiStore((s) => s.locale);
+  const lengthUnit = useUiStore((s) => s.lengthUnit);
+  const vehicle = useVehicle();
 
   const items = useLayoutStore((s) => s.items);
   const stops = useLayoutStore((s) => s.stops);
@@ -153,14 +181,14 @@ export function CargoDialog() {
         const { id: _id, presetId: _p, ...rest } = it;
         void _id;
         void _p;
-        return { ...DEFAULTS, ...rest } as CargoFormValues;
+        return coerceLegacy({ ...DEFAULTS, ...rest } as CargoFormValues);
       }
     }
     if (presetId) {
       const custom = customCargo.find((p) => p.id === presetId);
       const data = custom?.data ?? presets[presetId]?.data;
       if (data) {
-        return { ...DEFAULTS, ...data } as CargoFormValues;
+        return coerceLegacy({ ...DEFAULTS, ...data } as CargoFormValues);
       }
     }
     return DEFAULTS;
@@ -184,6 +212,7 @@ export function CargoDialog() {
   const shape = watch("shape");
   const stackable = watch("stackable");
   const color = watch("color");
+  const oversize = watch("isOversize");
 
   const groupSuggestions = useMemo(() => {
     const set = new Set<string>(["general"]);
@@ -195,6 +224,19 @@ export function CargoDialog() {
 
   const presetIsBuiltin = !!presetId && !customCargo.some((p) => p.id === presetId);
   const overridden = !!presetId && !!presets[presetId];
+
+  /** значения, ожидающие решения «негабарит или обычный» (диалог подтверждения) */
+  const [pendingOversize, setPendingOversize] = useState<CargoFormValues | null>(null);
+  /** отдельный флаг: при закрытии pendingOversize не трогаем, чтобы during exit-анимации
+   * описание не мигнуло пустыми габаритами «()» */
+  const [oversizeOpen, setOversizeOpen] = useState(false);
+
+  const commitAdd = (values: CargoFormValues, oversize: boolean) => {
+    addItem({ ...values, isOversize: oversize, presetId });
+    setOversizeOpen(false);
+    toast(t("toast.added"));
+    closeDialog();
+  };
 
   const onSubmit = handleSubmit((values) => {
     if (kind === "cargoPreset") {
@@ -216,9 +258,22 @@ export function CargoDialog() {
     if (itemId) {
       updateItem(itemId, values);
       toast(t("toast.updated"));
+    } else if (
+      !values.isOversize &&
+      exceedsVehicleDims(
+        values,
+        vehicle.innerLength,
+        vehicle.innerWidth,
+        vehicle.innerHeight
+      )
+    ) {
+      // добавление нового груза: физически больше кузова → спросить про негабарит
+      setPendingOversize(values);
+      setOversizeOpen(true);
+      return;
     } else {
-      addItem({ ...values, presetId });
-      toast(t("toast.added"));
+      commitAdd(values, values.isOversize);
+      return;
     }
     closeDialog();
   });
@@ -254,7 +309,21 @@ export function CargoDialog() {
         ? t("cargo.form.title.edit")
         : t("cargo.form.title.add");
 
+  /** габариты «виновника» AlertDialog в текущих единицах */
+  const oversizeDimsText = pendingOversize
+    ? `${formatLength(dimsBase(pendingOversize).dx, lengthUnit, locale, false)}×${formatLength(
+        dimsBase(pendingOversize).dy,
+        lengthUnit,
+        locale,
+        false
+      )}×${formatLength(dimsBase(pendingOversize).dz, lengthUnit, locale, false)} ${lengthUnitLabel(
+        lengthUnit,
+        locale
+      )}`
+    : "";
+
   return (
+    <>
     <Dialog open={open} onOpenChange={(v) => !v && closeDialog()}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
@@ -287,9 +356,36 @@ export function CargoDialog() {
               options={[
                 { value: "box", label: t("cargo.shape.box"), icon: Box },
                 { value: "cylinder", label: t("cargo.shape.cylinder"), icon: Cylinder },
-                { value: "oversize", label: t("cargo.shape.oversize"), icon: Triangle },
               ]}
             />
+          </div>
+
+          {/* негабарит — юзер-флаг, а не форма груза */}
+          <div className="flex items-center justify-between rounded-xl border border-border bg-panel-soft/60 px-3 py-2.5">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="c-oversize"
+                checked={oversize}
+                onCheckedChange={(v) => setValue("isOversize", v === true, { shouldDirty: true })}
+              />
+              <Label htmlFor="c-oversize" className="cursor-pointer">
+                {t("cargo.isOversize")}
+              </Label>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label={t("cargo.isOversize")}
+                    className="text-muted transition-colors hover:text-fg-2"
+                  >
+                    <Info className="size-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[280px]">
+                  <p>{t("cargo.isOversizeHint")}</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
           </div>
 
           {/* габариты */}
@@ -505,6 +601,39 @@ export function CargoDialog() {
         </form>
       </DialogContent>
     </Dialog>
+
+    <AlertDialog
+      open={oversizeOpen}
+      onOpenChange={(v) => {
+        if (!v) setOversizeOpen(false);
+      }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{t("cargo.oversizeConfirm.title")}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {t("cargo.oversizeConfirm.text", { dims: oversizeDimsText })}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel
+            onClick={() => {
+              if (pendingOversize) commitAdd(pendingOversize, false);
+            }}
+          >
+            {t("cargo.oversizeConfirm.keep")}
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              if (pendingOversize) commitAdd(pendingOversize, true);
+            }}
+          >
+            {t("cargo.oversizeConfirm.mark")}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }
 
